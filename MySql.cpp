@@ -127,6 +127,6 @@ string MySql::escape(const string& s) const
         s.size()
     );
 
-    assert('\0' == buffer.at(usedChars + 1));
+    assert('\0' == buffer.at(usedChars));
     return string(&buffer.at(0), &buffer.at(usedChars));
 }
