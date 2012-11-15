@@ -1,12 +1,8 @@
-CXXFLAGS=-std=c++0x -g -Wall -Wextra -Weffc++
+CXXFLAGS=-std=c++11 -Wall -Wextra -Weffc++ -shared -fPIC -g
 CXX=g++
 
-all: examples
-
-examples.o: examples.cpp MySql.hpp MySqlException.hpp
-
-examples: examples.o MySql.o MySql.hpp PreparedStatement.o MySqlException.o MySqlException.hpp
-	$(CXX) $(CXXFLAGS) examples.o MySql.o MySqlException.o PreparedStatement.o -lmysqlclient -o examples
+libmysqlcpp.so: mysql.o mysql.h prepared_statement.o mysql_exception.o mysql_exception.h
+	$(CXX) $(CXXFLAGS) mysql.o mysql_exception.o prepared_statement.o -lmysqlclient -o libmysqlcpp.so
 
 .PHONY: clean
 clean:
