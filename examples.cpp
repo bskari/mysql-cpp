@@ -1,5 +1,5 @@
-#include "MySql.hpp"
-#include "MySqlException.hpp"
+#include "mysql.h"
+#include "mysql_exception.h"
 
 #include <cassert>
 #include <iostream>
@@ -18,16 +18,16 @@ using std::vector;
 
 int main()
 {
-    cout << "Enter MySQL root password: " << endl;
-    string password;
-    cin >> password;
+//    cout << "Enter MySQL root password: " << endl;
+//    string password;
+//    cin >> password;
 
-    MySql conn("127.0.0.1", "root", password.c_str(), nullptr);
+    MySql conn("127.0.0.1", "root", "", "test_mysql_cpp");
 
     // Initialize a new test database
-    conn.runCommand(PreparedStatement(conn, "DROP DATABASE IF EXISTS test_mysql_cpp"));
-    conn.runCommand(PreparedStatement(conn, "CREATE DATABASE test_mysql_cpp"));
-    conn.runCommand(PreparedStatement(conn, "USE test_mysql_cpp"));
+//    conn.runCommand(PreparedStatement(conn, "DROP DATABASE IF EXISTS test_mysql_cpp"));
+//    conn.runCommand(PreparedStatement(conn, "CREATE DATABASE test_mysql_cpp"));
+//    conn.runCommand(PreparedStatement(conn, "USE test_mysql_cpp"));
     conn.runCommand(
         PreparedStatement(
             conn,
@@ -113,7 +113,7 @@ int main()
     try
     {
         // Wrong number of fields
-        vector<tuple<int>> ages;
+        vector<tuple<int, string, string, int>> ages;
         conn.runQuery(PreparedStatement(conn, "SELECT * FROM user"), ages);
     }
     catch (MySqlException& e)
