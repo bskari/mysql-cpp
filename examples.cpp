@@ -1,11 +1,12 @@
-#include "MySql.hpp"
-#include "MySqlException.hpp"
-
 #include <cassert>
+
 #include <iostream>
 #include <string>
 #include <tuple>
 #include <vector>
+
+#include "MySql.hpp"
+#include "MySqlException.hpp"
 
 using std::cin;
 using std::cout;
@@ -25,18 +26,28 @@ int main()
     MySql conn("127.0.0.1", "root", password.c_str(), nullptr);
 
     // Initialize a new test database
-    conn.runCommand(PreparedStatement(conn, "DROP DATABASE IF EXISTS test_mysql_cpp"));
-    conn.runCommand(PreparedStatement(conn, "CREATE DATABASE test_mysql_cpp"));
+    conn.runCommand(
+        PreparedStatement(
+            conn,
+            "DROP DATABASE IF EXISTS test_mysql_cpp"
+        )
+    );
+    conn.runCommand(
+        PreparedStatement(
+            conn,
+            "CREATE DATABASE test_mysql_cpp"
+        )
+    );
     conn.runCommand(PreparedStatement(conn, "USE test_mysql_cpp"));
     conn.runCommand(
         PreparedStatement(
             conn,
-            "CREATE TABLE user (\
-                id INT NOT NULL AUTO_INCREMENT,\
-                PRIMARY KEY(id),\
-                email VARCHAR(64) NOT NULL,\
-                password CHAR(64) NOT NULL,\
-                age INT NOT NULL)"
+            "CREATE TABLE user ("
+                "id INT NOT NULL AUTO_INCREMENT,"
+                "PRIMARY KEY(id),"
+                "email VARCHAR(64) NOT NULL,"
+                "password CHAR(64) NOT NULL,"
+                "age INT NOT NULL)"
         )
     );
 
@@ -46,7 +57,8 @@ int main()
     conn.runCommand(
         PreparedStatement(
             conn,
-            "INSERT INTO user (email, password, age) VALUES (?, ?, ?), (?, ?, ?)",
+            "INSERT INTO user (email, password, age)"
+                " VALUES (?, ?, ?), (?, ?, ?)",
             "brandon.skari@gmail.com",
             "peace",
             21,
@@ -56,7 +68,7 @@ int main()
         )
     );
 
-    vector<tuple<int, string, string, int>> users;
+    vector<tuple<int, string, string, int> > users;
     // *****************************
     // Automatically escaped strings
     // *****************************
@@ -66,22 +78,22 @@ int main()
             "SELECT * FROM user WHERE email = ?",
             "brandon.skari.org'; DROP DATABASE test_mysql_cpp -- "
         ),
-        users
+        &users
     );
     assert(0 == users.size());
 
     // *****************
     // Type safe selects
     // *****************
-    conn.runQuery(PreparedStatement(conn, "SELECT * FROM user"), users);
+    conn.runQuery(PreparedStatement(conn, "SELECT * FROM user"), &users);
 
     // GCC 4.6 added support for foreach loops
 #if __GNUC__ > 4 || (4 == __GNUC__ && __GNUC_MINOR__ >= 6)
     for (const auto& user : users)
     {
         cout << get<0>(user)
-            << ' ' << get<1>(user) 
-            << ' ' << get<2>(user) 
+            << ' ' << get<1>(user)
+            << ' ' << get<2>(user)
             << ' ' << get<3>(user) << endl;
     }
     // GCC 4.4 added support for auto-typed variables
@@ -113,10 +125,10 @@ int main()
     try
     {
         // Wrong number of fields
-        vector<tuple<int>> ages;
-        conn.runQuery(PreparedStatement(conn, "SELECT * FROM user"), ages);
+        vector<tuple<int> > ages;
+        conn.runQuery(PreparedStatement(conn, "SELECT * FROM user"), &ages);
     }
-    catch (MySqlException& e)
+    catch (const MySqlException& e)
     {
         cout << e.what() << endl;
     }
@@ -124,14 +136,19 @@ int main()
     try
     {
         // Bad casts
-        vector<tuple<int>> integers;
-        conn.runQuery(PreparedStatement(conn, "SELECT 1.0"), integers);
+        vector<tuple<int> > integers;
+        conn.runQuery(PreparedStatement(conn, "SELECT 1.0"), &integers);
     }
-    catch (MySqlException& e)
+    catch (const MySqlException& e)
     {
         cout << e.what() << endl;
     }
 
     // Cleanup
-    conn.runCommand(PreparedStatement(conn, "DROP DATABASE IF EXISTS test_mysql_cpp"));
+    conn.runCommand(
+        PreparedStatement(
+            conn,
+            "DROP DATABASE IF EXISTS test_mysql_cpp"
+        )
+    );
 }

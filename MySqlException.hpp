@@ -12,8 +12,8 @@
 class MySqlException : public std::exception
 {
 public:
-    MySqlException(const std::string& message);
-    MySqlException(const MYSQL* const conn);
+    explicit MySqlException(const std::string& message);
+    explicit MySqlException(const MYSQL* const conn);
     ~MySqlException() throw();
 
     const char* what() const throw();

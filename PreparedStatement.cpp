@@ -21,7 +21,9 @@ void PreparedStatement::init(const MySql&, const char* const statement)
         if ('?' == *iter)
         {
             // There are no arguments to process for this placeholder, so abort
-            throw MySqlException("Too few arguments to format string in PreparedStatement");
+            throw MySqlException(
+                "Too few arguments to format string in PreparedStatement"
+            );
         }
         prepareStream_ << *iter;
     }

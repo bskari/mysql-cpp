@@ -1,13 +1,15 @@
 #include "MySql.hpp"
 
-#include "MySqlException.hpp"
-
 #include <cassert>
 #include <cstdint>
 #include <mysql/mysql.h>
+
 #include <string>
 #include <sstream>
 #include <vector>
+
+#include "MySqlException.hpp"
+
 
 using std::string;
 using std::vector;
@@ -96,7 +98,8 @@ void MySql::runCommand(const PreparedStatement& command) const
             ? "Statement succeeded"
             : errorMessage
         );
-        exceptionMessage += "Arguments cannot be supplied to functions that don't return results";
+        exceptionMessage += "Arguments cannot be supplied to functions that"
+            " don't return results";
         throw MySqlException(exceptionMessage);
     }
 }
