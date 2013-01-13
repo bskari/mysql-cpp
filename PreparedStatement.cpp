@@ -1,5 +1,5 @@
-#include "mysql.h"
-#include "mysql_exception.h"
+#include "MySql.hpp"
+#include "MySqlException.hpp"
 
 #include <ostream>
 #include <sstream>
@@ -12,7 +12,7 @@ using std::ostringstream;
 using std::vector;
 
 
-void PreparedStatement::Init(const MySql&, const char* const statement)
+void PreparedStatement::init(const MySql&, const char* const statement)
 {
     for (const char* iter = statement; '\0' != *iter; ++iter)
     {
@@ -28,13 +28,13 @@ void PreparedStatement::Init(const MySql&, const char* const statement)
 }
 
 
-const char* PreparedStatement::CStr() const
+const char* PreparedStatement::c_str() const
 {
     return preparedStatement_.c_str();
 }
 
 
-const string& PreparedStatement::Str() const
+const string& PreparedStatement::str() const
 {
     return preparedStatement_;
 }
@@ -42,6 +42,6 @@ const string& PreparedStatement::Str() const
 
 ostream& operator<<(ostream& out, const PreparedStatement& rhs)
 {
-    out << rhs.Str();
+    out << rhs.str();
     return out;
 }

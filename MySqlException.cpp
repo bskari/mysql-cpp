@@ -1,6 +1,6 @@
-#include "mysql_exception.h"
-#include <mysql/mysql.h>
+#include "MySqlException.hpp"
 
+#include <mysql/mysql.h>
 #include <string>
 
 using std::string;
