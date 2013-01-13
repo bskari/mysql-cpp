@@ -1,10 +1,12 @@
-#include "MySql.hpp"
-#include "MySqlException.hpp"
+#include "PreparedStatement.hpp"
 
 #include <ostream>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "MySql.hpp"
+#include "MySqlException.hpp"
 
 using std::ostream;
 using std::string;
