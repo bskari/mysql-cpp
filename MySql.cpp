@@ -36,15 +36,17 @@ MySql::MySql(
     const char* const database,
     const uint16_t port
 )
-    : conn(mysql_init(nullptr))
+    : connection_(mysql_init(nullptr))
+    , statement_(nullptr)
+    , bindParameters_()
 {
-    if (nullptr == conn)
+    if (nullptr == connection_)
     {
         throw MySqlException("Unable to connect to MySQL");
     }
 
     const MYSQL* const success = mysql_real_connect(
-        conn,
+        connection_,
         hostname,
         username,
         password,
@@ -55,53 +57,33 @@ MySql::MySql(
     );
     if (nullptr == success)
     {
-        MySqlException mse(conn);
-        mysql_close(conn);
+        MySqlException mse(connection_);
+        mysql_close(connection_);
         throw mse;
     }
+
+    statement_ = mysql_stmt_init(connection_);
 }
 
 
 MySql::~MySql()
 {
-    mysql_close(conn);
+    mysql_close(connection_);
 }
 
 
-void MySql::runCommand(const PreparedStatement& command) const
+my_ulonglong MySql::runCommand(const char* const command)
 {
-    if (0 != mysql_query(conn, command.c_str()))
+    mysql_real_query(connection_, command, strlen(command));
+
+    // If the user ran a SELECT statement or something else, at least warn them
+    const my_ulonglong affectedRows = mysql_affected_rows(connection_);
+    if ((my_ulonglong) - 1 == affectedRows)
     {
-        throw MySqlException(conn);
+        throw MySqlException(connection_);
     }
 
-    MYSQL_RES* result = mysql_store_result(conn);
-    // If result is NULL, then the query was a command that doesn't return
-    // any results, e.g. 'USE mysql'
-    if (nullptr == result)
-    {
-        // If there's an error message, the command failed
-        const char* const message = mysql_error(conn);
-        if ('\0' != message[0])
-        {
-            throw MySqlException(conn);
-        }
-        mysql_free_result(result);
-    }
-    else
-    {
-        // Well, the command was sent to the database anyway, so at least tell
-        // the user if it succeeded or not
-        const char* const errorMessage = mysql_error(conn);
-        string exceptionMessage(
-            nullptr == errorMessage
-            ? "Statement succeeded"
-            : errorMessage
-        );
-        exceptionMessage += "Arguments cannot be supplied to functions that"
-            " don't return results";
-        throw MySqlException(exceptionMessage);
-    }
+    return affectedRows;
 }
 
 
@@ -115,21 +97,4 @@ void MySql::extractRow(
     {
         throw MySqlException("Too many columns returned by query");
     }
-}
-
-
-string MySql::escape(const string& s) const
-{
-    // Make the buffer twice as big so that any escaped values will fit
-    vector<char> buffer(s.size() * 2 + 1);
-
-    const size_t usedChars = mysql_real_escape_string(
-        conn,
-        &buffer.at(0),
-        s.c_str(),
-        s.size()
-    );
-
-    assert('\0' == buffer.at(usedChars));
-    return string(&buffer.at(0), &buffer.at(usedChars));
 }

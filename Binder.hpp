@@ -17,6 +17,7 @@ struct Binder
     static void bind(std::vector<MYSQL_BIND>* const) {}
 };
 
+
 template <size_t N, typename Head, typename... Tail>
 struct Binder<N, Head, Tail...>
 {
@@ -27,38 +28,6 @@ struct Binder<N, Head, Tail...>
         Head,
         Tail... tail
     );
-};
-
-
-// **********************************************
-// Partial template specialization for char array
-// **********************************************
-template <size_t N, typename... Tail>
-struct Binder<N, const char[6], Tail...>
-{
-    static void bind(
-        std::vector<MYSQL_BIND>* const bindParameters,
-        const char value[6],
-        Tail... tail
-    )
-    {
-        std::cout << "char array bind" << std::endl;
-        // Set up the bind parameters
-        MYSQL_BIND& bindParameter = bindParameters->at(N);
-
-        bindParameter.buffer_type = MYSQL_TYPE_STRING;
-        bindParameter.buffer = const_cast<void*>(
-            static_cast<const void*>(&value)
-        );
-        bindParameter.buffer_length = 6 - 1;
-        bindParameter.length = &bindParameter.buffer_length;
-        bindParameter.is_unsigned = 0;
-        bindParameter.is_null = 0;
-
-        Binder<N + 1, Tail...> b;
-        b.bind(bindParameters, tail...);
-    }
-    void foo() {}
 };
 
 
@@ -74,12 +43,13 @@ struct Binder<N, const char*, Tail...>
         Tail... tail
     )
     {
-        std::cout << "C-string bind" << std::endl;
         // Set up the bind parameters
         MYSQL_BIND& bindParameter = bindParameters->at(N);
 
         bindParameter.buffer_type = MYSQL_TYPE_STRING;
-        bindParameter.buffer = value;
+        bindParameter.buffer = const_cast<void*>(
+            static_cast<const void*>(value)
+        );
         bindParameter.buffer_length = strlen(value);
         bindParameter.length = &bindParameter.buffer_length;
         bindParameter.is_unsigned = 0;
@@ -89,13 +59,25 @@ struct Binder<N, const char*, Tail...>
         b.bind(bindParameters, tail...);
     }
 };
+template <size_t N, typename... Tail>
+struct Binder<N, char*, Tail...>
+{
+    static void bind(
+        std::vector<MYSQL_BIND>* const bindParameters,
+        char* const value,
+        Tail... tail
+    )
+    {
+        bind(bindParameters, value, tail...);
+    }
+};
 
 
 // ******************************************
 // Partial template specialization for string
 // ******************************************
 template <size_t N, typename... Tail>
-struct Binder<N, const std::string&, Tail...>
+struct Binder<N, std::string, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
@@ -126,7 +108,7 @@ struct Binder<N, const std::string&, Tail...>
 // Partial template specialization for int32_t
 // ********************************************
 template <size_t N, typename... Tail>
-struct Binder<N, const int32_t&, Tail...>
+struct Binder<N, int32_t, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
@@ -156,7 +138,7 @@ struct Binder<N, const int32_t&, Tail...>
 // Partial template specialization for uint32_t
 // ********************************************
 template <size_t N, typename... Tail>
-struct Binder<N, const uint32_t, Tail...>
+struct Binder<N, uint32_t, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
