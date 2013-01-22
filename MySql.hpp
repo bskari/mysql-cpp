@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-#include "Binder.hpp"
+#include "InputBinder.hpp"
 #include "MySqlException.hpp"
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 6)
@@ -54,12 +54,12 @@ public:
      * @param results A vector of tuples to store the results in.
      * @param args Arguments to bind to the query.
      */
-    //template<typename... Args>
-    //void runQuery(
-    //    const char* const query,
-    //    std::vector<std::tuple<Args...> >* const results,
-    //    Args&&... args
-    //);
+    template<typename... Args>
+    void runQuery(
+        std::vector<std::tuple<Args...> >* const results,
+        const char* const query,
+        Args... args
+    );
 
     /**
      * Command that doesn't return results, like "USE yelp" or
@@ -126,7 +126,6 @@ my_ulonglong MySql::runCommand(
         throw MySqlException(connection_);
     }
 
-    // We need, at most, this much space
     const size_t parameterCount = mysql_stmt_param_count(statement_);
     if (sizeof...(args) != parameterCount)
     {
@@ -139,7 +138,7 @@ my_ulonglong MySql::runCommand(
     }
 
     bindParameters_.resize(parameterCount);
-    Binder<0, Args...> binder;
+    InputBinder<0, Args...> binder;
     binder.bind(&bindParameters_, args...);
     if (0 != mysql_stmt_bind_param(statement_, &bindParameters_[0]))
     {
@@ -162,57 +161,84 @@ my_ulonglong MySql::runCommand(
 }
 
 
-/*
 template<typename... Args>
 void MySql::runQuery(
-    const char* const query,
     std::vector<std::tuple<Args...> >* const results,
-    Args&&... args
+    const char* const query,
+    Args... args
 )
 {
     assert(nullptr != results);
 
-    if (0 != mysql_query(connection_, query.c_str()))
+    const size_t length = ::strlen(query);
+    if (0 != mysql_stmt_prepare(statement_, query, length))
     {
         throw MySqlException(connection_);
     }
 
-    MYSQL_RES* result = mysql_store_result(connection_);
-    // If result is NULL, then the query was a statement that doesn't return
-    // any results, e.g. 'USE mysql'
-    if (nullptr != result)
+    const size_t parameterCount = mysql_stmt_param_count(statement_);
+    if (sizeof...(args) != parameterCount)
     {
-        // Check that the sizes match
-        const size_t numFields = mysql_num_fields(result);
-        if (numFields != sizeof...(Args))
+        mysql_stmt_close(statement_);
+
+        std::string errorMessage("Incorrect number of parameters; query required ");
+        errorMessage += boost::lexical_cast<std::string>(parameterCount);
+        errorMessage += " but ";
+        errorMessage += boost::lexical_cast<std::string>(sizeof...(args));
+        errorMessage += " parameters were provided.";
+        throw MySqlException(errorMessage);
+    }
+
+    bindParameters_.resize(parameterCount);
+    InputBinder<0, Args...> binder;
+    binder.bind(&bindParameters_, args...);
+    if (0 != mysql_stmt_bind_param(statement_, &bindParameters_[0]))
+    {
+        mysql_stmt_close(statement_);
+        throw MySqlException(connection_);
+    }
+
+    if (0 != mysql_stmt_execute(statement_))
+    {
+        mysql_stmt_close(statement_);
+        throw MySqlException(connection_);
+    }
+
+    // Check that the sizes match
+    const size_t numFields = mysql_num_fields(result);
+    if (numFields != sizeof...(Args))
+    {
+        mysql_free_result(result);
+        std::string errorMessage("Incorrect number of columns; expected ");
+        errorMessage += boost::lexical_cast<std::string>(sizeof...(Args));
+        errorMessage += " but query returned ";
+        errorMessage += boost::lexical_cast<std::string>(numFields);
+        throw MySqlException(errorMessage);
+    }
+
+    // Bind the input and output parameters
+    //
+
+    // Parse and save all of the rows
+    int fetchStatus = mysql_fetch_stmt
+    mysql_fetch_row(result);
+    while (nullptr != row)
+    {
+        std::tuple<Args...> rowTuple;
+        try
+        {
+            setTuple(row, &rowTuple);
+        }
+        catch (...)
         {
             mysql_free_result(result);
-            std::string errorMessage("Incorrect number of columns; expected ");
-            errorMessage += boost::lexical_cast<std::string>(sizeof...(Args));
-            errorMessage += " but query returned ";
-            errorMessage += boost::lexical_cast<std::string>(numFields);
-            throw MySqlException(errorMessage);
+            throw;
         }
 
-        // Parse and save all of the rows
-        MYSQL_ROW row = mysql_fetch_row(result);
-        while (nullptr != row)
-        {
-            std::tuple<Args...> rowTuple;
-            try
-            {
-                setTuple(row, &rowTuple);
-            }
-            catch (...)
-            {
-                mysql_free_result(result);
-                throw;
-            }
-
-            results->push_back(rowTuple);
-            row = mysql_fetch_row(result);
-        }
+        results->push_back(rowTuple);
+        row = mysql_fetch_row(result);
     }
+    /*
     else
     {
         // Well, the command was sent to the database anyway, so at least tell
@@ -226,8 +252,8 @@ void MySql::runQuery(
         exceptionMessage += "Arguments must be supplied to functions that return results";
         throw MySqlException(exceptionMessage);
     }
+    */
 }
-*/
 
 
 template<typename... Args>

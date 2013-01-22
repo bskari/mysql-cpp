@@ -1,5 +1,5 @@
-#ifndef BINDER_HPP_
-#define BINDER_HPP_
+#ifndef INPUTBINDER_HPP_
+#define INPUTBINDER_HPP_
 
 #include <cstdint>
 #include <cstring>
@@ -12,14 +12,14 @@
 // C++11 doesn't allow for partial template specialization of variadic
 // templated functions, but it does of classes
 template <size_t N, typename... Args>
-struct Binder
+struct InputBinder
 {
     static void bind(std::vector<MYSQL_BIND>* const) {}
 };
 
 
 template <size_t N, typename Head, typename... Tail>
-struct Binder<N, Head, Tail...>
+struct InputBinder<N, Head, Tail...>
 {
     // This is purposely left undefined; individual types should have partial
     // template specialized instances defined for them instead.
@@ -35,7 +35,7 @@ struct Binder<N, Head, Tail...>
 // Partial template specialization for char pointer
 // ************************************************
 template <size_t N, typename... Tail>
-struct Binder<N, const char*, Tail...>
+struct InputBinder<N, const char*, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
@@ -55,12 +55,12 @@ struct Binder<N, const char*, Tail...>
         bindParameter.is_unsigned = 0;
         bindParameter.is_null = 0;
 
-        Binder<N + 1, Tail...> b;
+        InputBinder<N + 1, Tail...> b;
         b.bind(bindParameters, tail...);
     }
 };
 template <size_t N, typename... Tail>
-struct Binder<N, char*, Tail...>
+struct InputBinder<N, char*, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
@@ -77,7 +77,7 @@ struct Binder<N, char*, Tail...>
 // Partial template specialization for string
 // ******************************************
 template <size_t N, typename... Tail>
-struct Binder<N, std::string, Tail...>
+struct InputBinder<N, std::string, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
@@ -98,7 +98,7 @@ struct Binder<N, std::string, Tail...>
         bindParameter.is_unsigned = 0;
         bindParameter.is_null = 0;
 
-        Binder<N + 1, Tail...> b;
+        InputBinder<N + 1, Tail...> b;
         b.bind(bindParameters, tail...);
     }
 };
@@ -108,7 +108,7 @@ struct Binder<N, std::string, Tail...>
 // Partial template specialization for int32_t
 // ********************************************
 template <size_t N, typename... Tail>
-struct Binder<N, int32_t, Tail...>
+struct InputBinder<N, int32_t, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
@@ -128,7 +128,7 @@ struct Binder<N, int32_t, Tail...>
         bindParameter.is_unsigned = 0;
         bindParameter.is_null = 0;
 
-        Binder<N + 1, Tail...> b;
+        InputBinder<N + 1, Tail...> b;
         b.bind(bindParameters, tail...);
     }
 };
@@ -138,7 +138,7 @@ struct Binder<N, int32_t, Tail...>
 // Partial template specialization for uint32_t
 // ********************************************
 template <size_t N, typename... Tail>
-struct Binder<N, uint32_t, Tail...>
+struct InputBinder<N, uint32_t, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
@@ -157,10 +157,10 @@ struct Binder<N, uint32_t, Tail...>
         bindParameter.is_unsigned = 1;
         bindParameter.is_null = 0;
 
-        Binder<N + 1, Tail...> b;
+        InputBinder<N + 1, Tail...> b;
         b.bind(bindParameters, tail...);
     }
 };
 
 
-#endif  // BINDER_HPP_
+#endif  // INPUTBINDER_HPP_
