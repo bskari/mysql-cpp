@@ -5,15 +5,15 @@ SHAREDFLAGS=$(CXXFLAGS) -shared
 
 all: examples
 
-examples.o: examples.cpp MySql.hpp MySqlException.hpp InputBinder.hpp
+examples.o: examples.cpp MySql.hpp MySqlException.hpp InputBinder.hpp OutputBinder.hpp
 
-MySql.o: MySql.cpp MySql.hpp InputBinder.hpp
+MySql.o: MySql.cpp MySql.hpp InputBinder.hpp OutputBinder.hpp MySqlException.o MySqlException.hpp
 	$(CXX) $(STATICFLAGS) MySql.cpp -o MySql.o
 
 MySqlException.o: MySqlException.cpp MySqlException.hpp
 	$(CXX) $(STATICFLAGS) MySqlException.cpp -o MySqlException.o
 
-libmysqlcpp.so: MySql.o MySql.hpp MySqlException.o MySqlException.hpp InputBinder.hpp
+libmysqlcpp.so: MySql.o MySql.hpp MySqlException.o MySqlException.hpp InputBinder.hpp OutputBinder.hpp
 	$(CXX) $(SHAREDFLAGS) -W1,-soname,libmysqlcpp.so -o libmysqlcpp.so MySql.o MySqlException.o
 
 examples: examples.o libmysqlcpp.so

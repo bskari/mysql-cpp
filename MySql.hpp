@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "InputBinder.hpp"
+#include "OutputBinder.hpp"
 #include "MySqlException.hpp"
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 6)
@@ -44,6 +45,7 @@ public:
     ~MySql();
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
+    // Deleted constructors are supported in GCC 4.4
     MySql(const MySql& rhs) = delete;
     MySql& operator=(const MySql& rhs) = delete;
 #endif
@@ -54,11 +56,11 @@ public:
      * @param results A vector of tuples to store the results in.
      * @param args Arguments to bind to the query.
      */
-    template<typename... Args>
+    template<typename... InputArgs, typename... OutputArgs>
     void runQuery(
-        std::vector<std::tuple<Args...> >* const results,
+        std::vector<std::tuple<OutputArgs...>>* const results,
         const char* const query,
-        Args... args
+        InputArgs... args
     );
 
     /**
@@ -76,33 +78,28 @@ public:
     my_ulonglong runCommand(const char* const command);
 
 private:
-    template<typename... Args>
-    void extractResults(MYSQL_RES* const result, Args&&... args) const;
-
-    template<typename T, typename... Args>
-    void extractRow(
-        MYSQL_ROW rowValues,
-        const size_t currentField,
-        const size_t totalFields,
-        T* const value,
-        Args... args
-    ) const;
-    void extractRow(
-        MYSQL_ROW rowValues,
-        const size_t currentField,
-        const size_t totalFields
-    ) const;
-
     template<std::size_t I> struct int_{};  // Compile-time counter
+
     template<typename Tuple, size_t I>
-    static void setTupleElements(MYSQL_ROW row, Tuple* const returnValue, int_<I>);
+    static void setTupleElements(
+        Tuple* const returnValue,
+        const std::vector<MYSQL_BIND>& bindParameters,
+        int_<I>
+    );
     template<typename Tuple>
-    static void setTupleElements(MYSQL_ROW, Tuple* const returnValue, int_<0>);
+    static void setTupleElements(
+        Tuple* const returnValue,
+        const std::vector<MYSQL_BIND>& bindParameters,
+        int_<-1>
+    );
+
     template<typename... Args>
-    void setTuple(MYSQL_ROW, std::tuple<Args...>* const t);
+    static void setTuple(
+        std::tuple<Args...>* const t,
+        const std::vector<MYSQL_BIND>& bindParameters
+    );
 
     MYSQL* connection_;
-    std::vector<MYSQL_BIND> bindParameters_;
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 4)
     // Hidden methods
@@ -145,10 +142,11 @@ my_ulonglong MySql::runCommand(
         throw MySqlException(errorMessage);
     }
 
-    bindParameters_.resize(parameterCount);
+    std::vector<MYSQL_BIND> bindParameters;
+    bindParameters.resize(parameterCount);
     InputBinder<0, Args...> binder;
-    binder.bind(&bindParameters_, args...);
-    if (0 != mysql_stmt_bind_param(statement, &bindParameters_[0]))
+    binder.bind(&bindParameters, args...);
+    if (0 != mysql_stmt_bind_param(statement, &bindParameters[0]))
     {
         MySqlException mse(statement);
         mysql_stmt_close(statement);
@@ -176,11 +174,11 @@ my_ulonglong MySql::runCommand(
 }
 
 
-template<typename... Args>
+template<typename... InputArgs, typename... OutputArgs>
 void MySql::runQuery(
-    std::vector<std::tuple<Args...> >* const results,
+    std::vector<std::tuple<OutputArgs...>>* const results,
     const char* const query,
-    Args... args
+    InputArgs... args
 )
 {
     assert(nullptr != results);
@@ -192,12 +190,16 @@ void MySql::runQuery(
         throw MySqlException(connection_);
     }
 
+    // Bind the input parameters
+    // Check that the parameter count is right
     const size_t parameterCount = mysql_stmt_param_count(statement);
-    if (sizeof...(args) != parameterCount)
+    if (sizeof...(InputArgs) != parameterCount)
     {
         mysql_stmt_close(statement);
 
-        std::string errorMessage("Incorrect number of parameters; query required ");
+        std::string errorMessage(
+            "Incorrect number of parameters; query required "
+        );
         errorMessage += boost::lexical_cast<std::string>(parameterCount);
         errorMessage += " but ";
         errorMessage += boost::lexical_cast<std::string>(sizeof...(args));
@@ -205,187 +207,68 @@ void MySql::runQuery(
         throw MySqlException(errorMessage);
     }
 
-    bindParameters_.resize(parameterCount);
-    InputBinder<0, Args...> binder;
-    binder.bind(&bindParameters_, args...);
-    if (0 != mysql_stmt_bind_param(statement, &bindParameters_[0]))
+    std::vector<MYSQL_BIND> inputBindParameters;
+    inputBindParameters.resize(parameterCount);
+    InputBinder<0, InputArgs...> inputBinder;
+    inputBinder.bind(&inputBindParameters, args...);
+    if (0 != mysql_stmt_bind_param(statement, &inputBindParameters[0]))
     {
+        MySqlException mse(statement);
         mysql_stmt_close(statement);
-        throw MySqlException(connection_);
+        throw mse;
     }
 
-    if (0 != mysql_stmt_execute(statement))
-    {
-        mysql_stmt_close(statement);
-        throw MySqlException(connection_);
-    }
-
+    // Bind the output parameters
     // Check that the sizes match
-    MYSQL_RES* const result = mysql_stmt_result_metadata(statement);
-    const size_t numFields = mysql_num_fields(result);
-    if (numFields != sizeof...(Args))
+    const size_t fieldCount = mysql_stmt_field_count(statement);
+    if (fieldCount != sizeof...(OutputArgs))
     {
-        mysql_free_result(result);
-        std::string errorMessage("Incorrect number of columns; expected ");
-        errorMessage += boost::lexical_cast<std::string>(sizeof...(Args));
-        errorMessage += " but query returned ";
-        errorMessage += boost::lexical_cast<std::string>(numFields);
-        throw MySqlException(errorMessage);
+        MySqlException mse(connection_);
+        mysql_stmt_close(statement);
+        throw mse;
     }
-
-    // Bind the input and output parameters
-
-    // Parse and save all of the rows
-    int fetchStatus = mysql_stmt_fetch(statement);
-    while (0 == fetchStatus)
-    {
-        /*
-        std::tuple<Args...> rowTuple;
-        try
-        {
-            setTuple(row, &rowTuple);
-        }
-        catch (...)
-        {
-            mysql_free_result(result);
-            throw;
-        }
-
-        results->push_back(rowTuple);
-        row = mysql_fetch_row(result);
-        fetchStatus = mysql_stmt_fetch(statement);
-        */
-    }
-
-    switch (fetchStatus)
-    {
-        case MYSQL_NO_DATA:
-            // No problem! All rows fetched.
-            break;
-        case MYSQL_DATA_TRUNCATED:
-            // TODO(bskari|2013-03-16) Handle truncated data
-            break;
-        case 1: // Error occurred
-            mysql_stmt_close(statement);
-            mysql_free_result(result);
-            throw MySqlException(mysql_stmt_error(statement));
-        default:
-            mysql_stmt_close(statement);
-            mysql_free_result(result);
-            assert(false && "Unknown error code from mysql_stmt_fetch");
-            throw MySqlException("Unknown error code from mysql_stmt_fetch");
-    }
+    OutputBinder<OutputArgs...> outputBinder(statement);
+    outputBinder.setResults(results);
 
     mysql_stmt_close(statement);
-    mysql_free_result(result);
-}
-
-
-template<typename... Args>
-void MySql::extractResults(MYSQL_RES* const result, Args&&... args) const
-{
-    MYSQL_ROW row = mysql_fetch_row(result);
-    if (nullptr == row)
-    {
-        mysql_free_result(result);
-        throw MySqlException(connection_);
-    }
-
-    try
-    {
-        const size_t numFields = mysql_num_fields(result);
-        extractRow(row, 0, numFields, std::forward<Args>(args)...);
-    }
-    catch (...)
-    {
-        mysql_free_result(result);
-        throw;
-    }
-}
-
-
-template<typename T, typename... Args>
-void MySql::extractRow(
-    MYSQL_ROW rowValues,
-    const size_t currentField,
-    const size_t totalFields,
-    T* const value,
-    Args... args
-) const
-{
-    assert(nullptr != value);
-
-    if (currentField >= totalFields)
-    {
-        throw MySqlException("Too few columns returned by query");
-    }
-    try
-    {
-        *value = boost::lexical_cast<T>(rowValues[currentField]);
-    }
-    catch (...)
-    {
-        std::string errorMessage("Unable to cast \"");
-        errorMessage += rowValues[currentField];
-        errorMessage += "\" to type ";
-        errorMessage += typeid(*value).name();
-        throw MySqlException(errorMessage);
-    }
-
-    extractRow(rowValues, currentField + 1, totalFields, args...);
 }
 
 
 template<typename Tuple, size_t I>
-void MySql::setTupleElements(MYSQL_ROW row, Tuple* const tuple, int_<I>)
+void MySql::setTupleElements(
+    Tuple* const tuple,
+    const std::vector<MYSQL_BIND>& bindParameters,
+    int_<I>
+)
 {
     assert(nullptr != tuple);
 
-    try
-    {
-        std::get<I>(*tuple) = boost::lexical_cast<
-            typename std::tuple_element<I, Tuple>::type
-        >(row[I]);
-    }
-    catch (...)
-    {
-        std::string errorMessage("Unable to cast \"");
-        errorMessage += row[I];
-        errorMessage += "\" to type ";
-        errorMessage += typeid(typename std::tuple_element<I, Tuple>::type).name();
-        throw MySqlException(errorMessage);
-    }
+    std::get<I>(*tuple) = *static_cast<const decltype(std::get<I>(*tuple))*>(
+        bindParameters.at(I).buffer
+    );
+
     // Recursively set the rest of the elements
-    setTupleElements(row, tuple, int_<I - 1>());
+    setTupleElements(tuple, bindParameters, int_<I - 1>());
 }
 
 
 template<typename Tuple>
-void MySql::setTupleElements(MYSQL_ROW row, Tuple* const tuple, int_<0>)
+void MySql::setTupleElements(
+    Tuple* const,
+    const std::vector<MYSQL_BIND>&,
+    int_<-1>
+)
 {
-    assert(nullptr != tuple);
-
-    try
-    {
-        std::get<0>(*tuple) = boost::lexical_cast<
-            typename std::tuple_element<0, Tuple>::type
-        >(row[0]);
-    }
-    catch (...)
-    {
-        std::string errorMessage("Unable to cast \"");
-        errorMessage += row[0];
-        errorMessage += "\" to type ";
-        errorMessage += typeid(typename std::tuple_element<0, Tuple>::type).name();
-        throw MySqlException(errorMessage);
-    }
 }
 
 
 template<typename... Args>
-void MySql::setTuple(MYSQL_ROW row, std::tuple<Args...>* const t)
+void MySql::setTuple(
+    std::tuple<Args...>* const t,
+    const std::vector<MYSQL_BIND>& bindParameters
+)
 {
-    setTupleElements(row, t, int_<sizeof...(Args) - 1>());
+    setTupleElements(t, bindParameters, int_<sizeof...(Args) - 1>());
 }
 
 

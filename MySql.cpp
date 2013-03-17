@@ -37,7 +37,6 @@ MySql::MySql(
     const uint16_t port
 )
     : connection_(mysql_init(nullptr))
-    , bindParameters_()
 {
     if (nullptr == connection_)
     {
@@ -81,17 +80,4 @@ my_ulonglong MySql::runCommand(const char* const command)
     }
 
     return affectedRows;
-}
-
-
-void MySql::extractRow(
-    MYSQL_ROW,
-    const size_t currentField,
-    const size_t totalFields
-) const
-{
-    if (currentField != totalFields)
-    {
-        throw MySqlException("Too many columns returned by query");
-    }
 }
