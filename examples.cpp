@@ -17,6 +17,34 @@ using std::tuple;
 using std::vector;
 
 
+template<std::size_t> struct int_{}; // compile-time counter
+
+template<typename Char, typename Traits, typename Tuple, std::size_t I>
+void printTuple(std::basic_ostream<Char, Traits>& out, Tuple const& t, int_<I>)
+{
+    printTuple(out, t, int_<I-1>());
+    out << ", " << std::get<I>(t);
+}
+
+template<typename Char, typename Traits, typename Tuple>
+void printTuple(std::basic_ostream<Char, Traits>& out, Tuple const& t, int_<0>)
+{
+      out << std::get<0>(t);
+}
+
+template<typename Char, typename Traits, typename... Args>
+std::ostream& operator<<(
+    std::basic_ostream<Char, Traits>& out,
+    std::tuple<Args...> const& t
+)
+{
+    out << "(";
+    printTuple(out, t, int_<sizeof...(Args) - 1>());
+    out << ")";
+    return out;
+}
+
+
 int main(int argc, char* argv[])
 {
     string password;
@@ -38,12 +66,14 @@ int main(int argc, char* argv[])
     conn.runCommand("INSERT INTO delete_me (name) VALUES (?)", "Brandon");
 
     int x = 0;
-    std::vector<std::tuple<int>> results;
-    conn.runQuery(&results, "SELECT id FROM delete_me WHERE id > ?", x);
+    std::vector<std::tuple<int, string>> results;
+    conn.runQuery(&results, "SELECT id, name FROM delete_me WHERE id > ?", x);
     const auto end(results.cend());
     cout << "Size: " << results.size() << endl;
     for (auto i(results.cbegin()); i != end; ++i)
     {
-        cout << get<0>(*i) << endl;
+        cout << *i << endl;
     }
+
+    return EXIT_SUCCESS;
 }

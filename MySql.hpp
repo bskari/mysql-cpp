@@ -198,7 +198,7 @@ void MySql::runQuery(
         mysql_stmt_close(statement);
 
         std::string errorMessage(
-            "Incorrect number of parameters; query required "
+            "Incorrect number of input parameters; query required "
         );
         errorMessage += boost::lexical_cast<std::string>(parameterCount);
         errorMessage += " but ";
@@ -218,15 +218,6 @@ void MySql::runQuery(
         throw mse;
     }
 
-    // Bind the output parameters
-    // Check that the sizes match
-    const size_t fieldCount = mysql_stmt_field_count(statement);
-    if (fieldCount != sizeof...(OutputArgs))
-    {
-        MySqlException mse(connection_);
-        mysql_stmt_close(statement);
-        throw mse;
-    }
     OutputBinder<OutputArgs...> outputBinder(statement);
     outputBinder.setResults(results);
 

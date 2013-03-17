@@ -44,6 +44,23 @@ private:
 };
 
 
+namespace OutputBinderNamespace {
+    template<std::size_t I> struct int_{};  // Compile-time counter
+}
+template<typename Tuple, size_t I>
+static void setTupleElements(
+    Tuple* const tuple,
+    const std::vector<MYSQL_BIND>& bindParameters,
+    typename OutputBinderNamespace::int_<I>
+);
+template<typename Tuple>
+static void setTupleElements(
+    Tuple* const tuple,
+    const std::vector<MYSQL_BIND>& bindParameters,
+    typename OutputBinderNamespace::int_<-1>
+);
+
+
 template <typename... Args>
 OutputBinder<Args...>::OutputBinder(MYSQL_STMT* const statement)
     : statement_(statement)
@@ -61,13 +78,46 @@ void OutputBinder<Args...>::setResults(
     const size_t fieldCount = mysql_stmt_field_count(statement_);
     if (fieldCount != sizeof...(Args))
     {
-        MySqlException mse(statement_);
+        mysql_stmt_close(statement_);
+        std::string errorMessage(
+            "Incorrect number of output parameters; query required "
+        );
+        errorMessage += boost::lexical_cast<std::string>(fieldCount);
+        errorMessage += " but ";
+        errorMessage += boost::lexical_cast<std::string>(sizeof...(Args));
+        errorMessage += " parameters were provided.";
+        throw MySqlException(errorMessage);
+    }
+
+    std::vector<MYSQL_BIND> parameters;
+    parameters.resize(fieldCount);
+    std::vector<std::vector<char>> buffers(
+        fieldCount,
+        std::vector<char>(' ', 20)
+    );
+    std::vector<uint64_t> lengths;
+    lengths.resize(fieldCount);
+
+    // So, normally you would just bind each type to a buffer specific to that
+    // type, e.g. &int for INTs and char* for VARCHAR, but if someone gives me
+    // a tuple with a std::string, I don't really know how to use that as a
+    // buffer, so for now I'll just use char* buffers and save everything and
+    // boost::lexical_cast to set the values.
+    for (size_t i = 0; i < buffers.size(); ++i)
+    {
+        MYSQL_BIND& bind = parameters.at(i);
+        bind.buffer_type = MYSQL_TYPE_STRING;
+        bind.buffer = &(buffers.at(i).at(0));
+        bind.is_null = 0;
+        bind.buffer_length = buffers.at(i).size();
+        bind.length = &lengths.at(i);
+    }
+    if (0 != mysql_stmt_bind_result(statement_, &parameters.at(0)))
+    {
+        MySqlException mse(mysql_stmt_error(statement_));
         mysql_stmt_close(statement_);
         throw mse;
     }
-
-    std::vector<MYSQL_BIND> outputBindParameters;
-    outputBindParameters.resize(fieldCount);
 
     if (0 != mysql_stmt_execute(statement_))
     {
@@ -89,7 +139,7 @@ void OutputBinder<Args...>::setResults(
         std::tuple<Args...> rowTuple;
         try
         {
-            setTuple(&rowTuple, outputBindParameters);
+            setTuple(&rowTuple, parameters);
         }
         catch (...)
         {
@@ -99,7 +149,6 @@ void OutputBinder<Args...>::setResults(
 
         results->push_back(rowTuple);
         fetchStatus = mysql_stmt_fetch(statement_);
-        std::cout << "Fetch status " << fetchStatus << std::endl;
     }
 
     switch (fetchStatus)
@@ -108,18 +157,18 @@ void OutputBinder<Args...>::setResults(
             // No problem! All rows fetched.
             break;
         case 1: // Error occurred
-            {
+        {
             MySqlException mse(mysql_stmt_error(statement_));
             mysql_stmt_close(statement_);
             throw mse;
-            }
+        }
         default:
-            {
+        {
             assert(false && "Unknown error code from mysql_stmt_fetch");
             MySqlException mse(mysql_stmt_error(statement_));
             mysql_stmt_close(statement_);
             throw mse;
-            }
+        }
     }
 }
 
@@ -130,9 +179,40 @@ void OutputBinder<Args...>::setTuple(
     const std::vector<MYSQL_BIND>& bindParameters
 )
 {
-    // TODO(bskari|2013-03-17) Set this correctly and do it recursively for
-    // each element in the tuple
-    std::get<0>(*tuple) = 0;
+    setTupleElements(
+        tuple,
+        bindParameters,
+        OutputBinderNamespace::int_<sizeof...(Args) - 1>()
+    );
+}
+
+
+template<typename Tuple, size_t I>
+void setTupleElements(
+    Tuple* const tuple,
+    const std::vector<MYSQL_BIND>& bindParameters,
+    typename OutputBinderNamespace::int_<I>
+)
+{
+    std::get<I>(*tuple) =
+        boost::lexical_cast<typename std::tuple_element<I, Tuple>::type>(
+            static_cast<char*>(bindParameters.at(I).buffer)
+        );
+    setTupleElements(
+        tuple,
+        bindParameters,
+        OutputBinderNamespace::int_<I - 1>()
+    );
+}
+
+
+template<typename Tuple>
+void setTupleElements(
+    Tuple* const,
+    const std::vector<MYSQL_BIND>&,
+    typename OutputBinderNamespace::int_<-1>
+)
+{
 }
 
 
