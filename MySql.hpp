@@ -102,7 +102,6 @@ private:
     void setTuple(MYSQL_ROW, std::tuple<Args...>* const t);
 
     MYSQL* connection_;
-    MYSQL_STMT* statement_;
     std::vector<MYSQL_BIND> bindParameters_;
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 4)
@@ -119,16 +118,25 @@ my_ulonglong MySql::runCommand(
     Args... args
 )
 {
-    const size_t length = ::strlen(command);
-    const int status = mysql_stmt_prepare(statement_, command, length);
-    if (0 != status)
+    MYSQL_STMT* const statement = mysql_stmt_init(connection_);
+    if (nullptr == statement)
     {
         throw MySqlException(connection_);
     }
 
-    const size_t parameterCount = mysql_stmt_param_count(statement_);
+    const size_t length = ::strlen(command);
+    const int status = mysql_stmt_prepare(statement, command, length);
+    if (0 != status)
+    {
+        MySqlException mse(statement);
+        mysql_stmt_close(statement);
+        throw mse;
+    }
+
+    const size_t parameterCount = mysql_stmt_param_count(statement);
     if (sizeof...(args) != parameterCount)
     {
+        mysql_stmt_close(statement);
         std::string errorMessage("Incorrect number of parameters; query required ");
         errorMessage += boost::lexical_cast<std::string>(parameterCount);
         errorMessage += " but ";
@@ -140,23 +148,30 @@ my_ulonglong MySql::runCommand(
     bindParameters_.resize(parameterCount);
     InputBinder<0, Args...> binder;
     binder.bind(&bindParameters_, args...);
-    if (0 != mysql_stmt_bind_param(statement_, &bindParameters_[0]))
+    if (0 != mysql_stmt_bind_param(statement, &bindParameters_[0]))
     {
-        throw MySqlException(connection_);
+        MySqlException mse(statement);
+        mysql_stmt_close(statement);
+        throw mse;
     }
 
-    if (0 != mysql_stmt_execute(statement_))
+    if (0 != mysql_stmt_execute(statement))
     {
-        throw MySqlException(connection_);
+        MySqlException mse(statement);
+        mysql_stmt_close(statement);
+        throw mse;
     }
 
     // If the user ran a SELECT statement or something else, at least warn them
-    const my_ulonglong affectedRows = mysql_stmt_affected_rows(statement_);
-    if ((my_ulonglong) - 1 == affectedRows)
+    const my_ulonglong affectedRows = mysql_stmt_affected_rows(statement);
+    if (((my_ulonglong)(-1)) == affectedRows)
     {
-        throw MySqlException(connection_);
+        MySqlException mse(statement);
+        mysql_stmt_close(statement);
+        throw mse;
     }
 
+    mysql_stmt_close(statement);
     return affectedRows;
 }
 
@@ -169,17 +184,18 @@ void MySql::runQuery(
 )
 {
     assert(nullptr != results);
+    MYSQL_STMT* const statement = mysql_stmt_init(connection_);
 
     const size_t length = ::strlen(query);
-    if (0 != mysql_stmt_prepare(statement_, query, length))
+    if (0 != mysql_stmt_prepare(statement, query, length))
     {
         throw MySqlException(connection_);
     }
 
-    const size_t parameterCount = mysql_stmt_param_count(statement_);
+    const size_t parameterCount = mysql_stmt_param_count(statement);
     if (sizeof...(args) != parameterCount)
     {
-        mysql_stmt_close(statement_);
+        mysql_stmt_close(statement);
 
         std::string errorMessage("Incorrect number of parameters; query required ");
         errorMessage += boost::lexical_cast<std::string>(parameterCount);
@@ -192,19 +208,20 @@ void MySql::runQuery(
     bindParameters_.resize(parameterCount);
     InputBinder<0, Args...> binder;
     binder.bind(&bindParameters_, args...);
-    if (0 != mysql_stmt_bind_param(statement_, &bindParameters_[0]))
+    if (0 != mysql_stmt_bind_param(statement, &bindParameters_[0]))
     {
-        mysql_stmt_close(statement_);
+        mysql_stmt_close(statement);
         throw MySqlException(connection_);
     }
 
-    if (0 != mysql_stmt_execute(statement_))
+    if (0 != mysql_stmt_execute(statement))
     {
-        mysql_stmt_close(statement_);
+        mysql_stmt_close(statement);
         throw MySqlException(connection_);
     }
 
     // Check that the sizes match
+    MYSQL_RES* const result = mysql_stmt_result_metadata(statement);
     const size_t numFields = mysql_num_fields(result);
     if (numFields != sizeof...(Args))
     {
@@ -217,13 +234,12 @@ void MySql::runQuery(
     }
 
     // Bind the input and output parameters
-    //
 
     // Parse and save all of the rows
-    int fetchStatus = mysql_fetch_stmt
-    mysql_fetch_row(result);
-    while (nullptr != row)
+    int fetchStatus = mysql_stmt_fetch(statement);
+    while (0 == fetchStatus)
     {
+        /*
         std::tuple<Args...> rowTuple;
         try
         {
@@ -237,22 +253,31 @@ void MySql::runQuery(
 
         results->push_back(rowTuple);
         row = mysql_fetch_row(result);
+        fetchStatus = mysql_stmt_fetch(statement);
+        */
     }
-    /*
-    else
+
+    switch (fetchStatus)
     {
-        // Well, the command was sent to the database anyway, so at least tell
-        // the user if it succeeded or not
-        const char* const errorMessage = mysql_error(connection_);
-        std::string exceptionMessage(
-            nullptr == errorMessage
-            ? "Statement succeeded"
-            : errorMessage
-        );
-        exceptionMessage += "Arguments must be supplied to functions that return results";
-        throw MySqlException(exceptionMessage);
+        case MYSQL_NO_DATA:
+            // No problem! All rows fetched.
+            break;
+        case MYSQL_DATA_TRUNCATED:
+            // TODO(bskari|2013-03-16) Handle truncated data
+            break;
+        case 1: // Error occurred
+            mysql_stmt_close(statement);
+            mysql_free_result(result);
+            throw MySqlException(mysql_stmt_error(statement));
+        default:
+            mysql_stmt_close(statement);
+            mysql_free_result(result);
+            assert(false && "Unknown error code from mysql_stmt_fetch");
+            throw MySqlException("Unknown error code from mysql_stmt_fetch");
     }
-    */
+
+    mysql_stmt_close(statement);
+    mysql_free_result(result);
 }
 
 

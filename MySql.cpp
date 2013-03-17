@@ -37,7 +37,6 @@ MySql::MySql(
     const uint16_t port
 )
     : connection_(mysql_init(nullptr))
-    , statement_(nullptr)
     , bindParameters_()
 {
     if (nullptr == connection_)
@@ -61,8 +60,6 @@ MySql::MySql(
         mysql_close(connection_);
         throw mse;
     }
-
-    statement_ = mysql_stmt_init(connection_);
 }
 
 

@@ -10,7 +10,8 @@
 #include <vector>
 
 // C++11 doesn't allow for partial template specialization of variadic
-// templated functions, but it does of classes
+// templated functions, but it does of classes, so wrap this function in a
+// class
 template <size_t N, typename... Args>
 struct InputBinder
 {
@@ -25,7 +26,7 @@ struct InputBinder<N, Head, Tail...>
     // template specialized instances defined for them instead.
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
-        Head,
+        Head value,
         Tail... tail
     );
 };
@@ -39,7 +40,7 @@ struct InputBinder<N, const char*, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
-        const char* const value,
+        const char* const& value,
         Tail... tail
     )
     {
@@ -60,11 +61,11 @@ struct InputBinder<N, const char*, Tail...>
     }
 };
 template <size_t N, typename... Tail>
-struct InputBinder<N, char*, Tail...>
+struct InputBinder<N, char*&, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
-        char* const value,
+        const char* const& value,
         Tail... tail
     )
     {

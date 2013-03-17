@@ -11,8 +11,14 @@ MySqlException::MySqlException(const string& message)
 }
 
 
-MySqlException::MySqlException(const MYSQL* const conn)
-    : message_(getServerErrorMessage(conn))
+MySqlException::MySqlException(const MYSQL* const connection)
+    : message_(getServerErrorMessage(connection))
+{
+}
+
+
+MySqlException::MySqlException(const MYSQL_STMT* const statement)
+    : message_(getServerErrorMessage(statement))
 {
 }
 
@@ -34,6 +40,23 @@ const char* MySqlException::getServerErrorMessage(const MYSQL* const conn)
     // The MySQL C interface is backward compatible with C89, so it doesn't
     // recognize const. It *should* be const though, so just work around it.
     const char* const message = mysql_error(const_cast<MYSQL*>(conn));
+    if ('\0' != message[0])  // Error message isn't empty
+    {
+        return message;
+    }
+    return "Unknown error";
+}
+
+
+const char* MySqlException::getServerErrorMessage(
+    const MYSQL_STMT* const statement
+)
+{
+    // The MySQL C interface is backward compatible with C89, so it doesn't
+    // recognize const. It *should* be const though, so just work around it.
+    const char* const message = mysql_stmt_error(
+        const_cast<MYSQL_STMT*>(statement)
+    );
     if ('\0' != message[0])  // Error message isn't empty
     {
         return message;
