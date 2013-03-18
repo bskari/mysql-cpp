@@ -322,239 +322,58 @@ static void setBindElements(
 // ****************************************************
 // Partial template specializations for element setters
 // ****************************************************
-template <>
-class OutputBinderElementSetter<int8_t>
-{
-public:
-    void setElement(
-        int8_t* const value,
-        const MYSQL_BIND& bind
-    )
-    {
-        *value = *static_cast<const decltype(value)>(bind.buffer);
-    }
+#ifndef OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION
+#define OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(type) \
+template <> \
+class OutputBinderElementSetter<type> \
+{ \
+public: \
+    void setElement( \
+        type* const value, \
+        const MYSQL_BIND& bind \
+    ) \
+    { \
+        *value = *static_cast<const decltype(value)>(bind.buffer); \
+    } \
 };
-
-
-template <>
-class OutputBinderElementSetter<uint8_t>
-{
-public:
-    void setElement(
-        uint8_t* const value,
-        const MYSQL_BIND& bind
-    )
-    {
-        *value = *static_cast<const decltype(value)>(bind.buffer);
-    }
-};
-
-
-template <>
-class OutputBinderElementSetter<int16_t>
-{
-public:
-    void setElement(
-        int16_t* const value,
-        const MYSQL_BIND& bind
-    )
-    {
-        *value = *static_cast<const decltype(value)>(bind.buffer);
-    }
-};
-
-
-template <>
-class OutputBinderElementSetter<uint16_t>
-{
-public:
-    void setElement(
-        uint16_t* const value,
-        const MYSQL_BIND& bind
-    )
-    {
-        *value = *static_cast<const decltype(value)>(bind.buffer);
-    }
-};
-
-
-template <>
-class OutputBinderElementSetter<int32_t>
-{
-public:
-    void setElement(
-        int32_t* const value,
-        const MYSQL_BIND& bind
-    )
-    {
-        *value = *static_cast<const decltype(value)>(bind.buffer);
-    }
-};
-
-
-template <>
-class OutputBinderElementSetter<uint32_t>
-{
-public:
-    void setElement(
-        uint32_t* const value,
-        const MYSQL_BIND& bind
-    )
-    {
-        *value = *static_cast<const decltype(value)>(bind.buffer);
-    }
-};
-
-
-template <>
-class OutputBinderElementSetter<int64_t>
-{
-public:
-    void setElement(
-        int64_t* const value,
-        const MYSQL_BIND& bind
-    )
-    {
-        *value = *static_cast<const decltype(value)>(bind.buffer);
-    }
-};
-
-
-template <>
-class OutputBinderElementSetter<uint64_t>
-{
-public:
-    void setElement(
-        uint64_t* const value,
-        const MYSQL_BIND& bind
-    )
-    {
-        *value = *static_cast<const decltype(value)>(bind.buffer);
-    }
-};
+#endif
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int8_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint8_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int16_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint16_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int32_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint32_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int64_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint64_t)
 
 
 // *************************************************
 // Partial template specializations for bind setters
 // *************************************************
-template <>
-struct OutputBinderParameterSetter<int8_t>
-{
-public:
-    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer)
-    {
-        bind->buffer_type = MYSQL_TYPE_TINY;
-        buffer->resize(sizeof(int8_t));
-        bind->buffer = &(buffer->at(0));
-        bind->is_null = 0;
-        bind->is_unsigned = 0;
-    }
+#ifndef OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION
+#define OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(type, mysqlType, isUnsigned) \
+template <> \
+struct OutputBinderParameterSetter<type> \
+{ \
+public: \
+    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer) \
+    { \
+        bind->buffer_type = mysqlType; \
+        buffer->resize(sizeof(type)); \
+        bind->buffer = &(buffer->at(0)); \
+        bind->is_null = 0; \
+        bind->is_unsigned = isUnsigned; \
+    } \
 };
-
-
-template <>
-struct OutputBinderParameterSetter<uint8_t>
-{
-public:
-    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer)
-    {
-        bind->buffer_type = MYSQL_TYPE_TINY;
-        buffer->resize(sizeof(uint8_t));
-        bind->buffer = &(buffer->at(0));
-        bind->is_null = 0;
-        bind->is_unsigned = 1;
-    }
-};
-
-
-template <>
-struct OutputBinderParameterSetter<int16_t>
-{
-public:
-    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer)
-    {
-        bind->buffer_type = MYSQL_TYPE_SHORT;
-        buffer->resize(sizeof(int16_t));
-        bind->buffer = &(buffer->at(0));
-        bind->is_null = 0;
-        bind->is_unsigned = 0;
-    }
-};
-
-
-template <>
-struct OutputBinderParameterSetter<uint16_t>
-{
-public:
-    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer)
-    {
-        bind->buffer_type = MYSQL_TYPE_SHORT;
-        buffer->resize(sizeof(uint16_t));
-        bind->buffer = &(buffer->at(0));
-        bind->is_null = 0;
-        bind->is_unsigned = 1;
-    }
-};
-
-
-template <>
-struct OutputBinderParameterSetter<int32_t>
-{
-public:
-    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer)
-    {
-        bind->buffer_type = MYSQL_TYPE_LONG;
-        buffer->resize(sizeof(int32_t));
-        bind->buffer = &(buffer->at(0));
-        bind->is_null = 0;
-        bind->is_unsigned = 0;
-    }
-};
-
-
-template <>
-struct OutputBinderParameterSetter<uint32_t>
-{
-public:
-    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer)
-    {
-        bind->buffer_type = MYSQL_TYPE_LONG;
-        buffer->resize(sizeof(uint32_t));
-        bind->buffer = &(buffer->at(0));
-        bind->is_null = 0;
-        bind->is_unsigned = 1;
-    }
-};
-
-
-template <>
-struct OutputBinderParameterSetter<int64_t>
-{
-public:
-    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer)
-    {
-        bind->buffer_type = MYSQL_TYPE_LONGLONG;
-        buffer->resize(sizeof(int64_t));
-        bind->buffer = &(buffer->at(0));
-        bind->is_null = 0;
-        bind->is_unsigned = 0;
-    }
-};
-
-
-template <>
-struct OutputBinderParameterSetter<uint64_t>
-{
-public:
-    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer)
-    {
-        bind->buffer_type = MYSQL_TYPE_LONGLONG;
-        buffer->resize(sizeof(uint64_t));
-        bind->buffer = &(buffer->at(0));
-        bind->is_null = 0;
-        bind->is_unsigned = 1;
-    }
-};
+#endif
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int8_t, MYSQL_TYPE_TINY, 0)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint8_t, MYSQL_TYPE_TINY, 1)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int16_t, MYSQL_TYPE_TINY, 0)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint16_t, MYSQL_TYPE_TINY, 1)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int32_t, MYSQL_TYPE_TINY, 0)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint32_t, MYSQL_TYPE_TINY, 1)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int64_t, MYSQL_TYPE_TINY, 0)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint64_t, MYSQL_TYPE_TINY, 1)
 
 
 #endif  // OUTPUTBINDER_HPP_
