@@ -45,9 +45,9 @@ private:
 
 
 namespace OutputBinderNamespace {
-    template<std::size_t I> struct int_{};  // Compile-time counter
+    template<int I> struct int_{};  // Compile-time counter
 }
-template<typename Tuple, size_t I>
+template<typename Tuple, int I>
 static void setTupleElements(
     Tuple* const tuple,
     const std::vector<MYSQL_BIND>& bindParameters,
@@ -59,6 +59,17 @@ static void setTupleElements(
     const std::vector<MYSQL_BIND>& bindParameters,
     typename OutputBinderNamespace::int_<-1>
 );
+
+
+// C++11 doesn't allow for partial template specialization of variadic
+// templated functions, but it does of classes, so wrap this function in a
+// class
+template <typename T>
+struct OutputBinderElementSetter
+{
+public:
+    static void setElement(T* const value, const MYSQL_BIND& bind);
+};
 
 
 template <typename... Args>
@@ -187,17 +198,17 @@ void OutputBinder<Args...>::setTuple(
 }
 
 
-template<typename Tuple, size_t I>
+template<typename Tuple, int I>
 void setTupleElements(
     Tuple* const tuple,
     const std::vector<MYSQL_BIND>& bindParameters,
     typename OutputBinderNamespace::int_<I>
 )
 {
-    std::get<I>(*tuple) =
-        boost::lexical_cast<typename std::tuple_element<I, Tuple>::type>(
-            static_cast<char*>(bindParameters.at(I).buffer)
-        );
+    OutputBinderElementSetter<
+        typename std::tuple_element<I, Tuple>::type
+    > setter;
+    setter.setElement(&(std::get<I>(*tuple)), bindParameters.at(I));
     setTupleElements(
         tuple,
         bindParameters,
@@ -213,6 +224,16 @@ void setTupleElements(
     typename OutputBinderNamespace::int_<-1>
 )
 {
+}
+
+
+template <typename T>
+void OutputBinderElementSetter<T>::setElement(
+    T* const value,
+    const MYSQL_BIND& bind
+)
+{
+    *value = boost::lexical_cast<T>(static_cast<char*>(bind.buffer));
 }
 
 
