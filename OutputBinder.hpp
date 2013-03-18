@@ -29,9 +29,14 @@ public:
 #endif
 
 private:
-    void setTuple(
+    static void setTuple(
         std::tuple<Args...>* tuple,
         const std::vector<MYSQL_BIND>& bindParameters
+    );
+    static void setBind(
+        const std::tuple<Args...>& tuple,
+        std::vector<MYSQL_BIND>* const outputParameters,
+        std::vector<std::vector<char>>* const buffers
     );
 
     MYSQL_STMT* const statement_;
@@ -59,16 +64,58 @@ static void setTupleElements(
     const std::vector<MYSQL_BIND>& bindParameters,
     typename OutputBinderNamespace::int_<-1>
 );
-
-
 // C++11 doesn't allow for partial template specialization of variadic
 // templated functions, but it does of classes, so wrap this function in a
 // class
 template <typename T>
-struct OutputBinderElementSetter
+class OutputBinderElementSetter
 {
 public:
-    static void setElement(T* const value, const MYSQL_BIND& bind);
+    /**
+     * Default setter for non-specialized types using Boost lexical_cast.
+     */
+    static void setElement(T* const value, const MYSQL_BIND& bind)
+    {
+        *value = boost::lexical_cast<T>(static_cast<char*>(bind.buffer));
+    }
+};
+
+
+template<typename Tuple, int I>
+static void setBindElements(
+    const Tuple& tuple,  // We only need this so we can access the element types
+    std::vector<MYSQL_BIND>* const bindParameters,
+    std::vector<std::vector<char>>* const buffers,
+    typename OutputBinderNamespace::int_<I>
+);
+template<typename Tuple>
+static void setBindElements(
+    const Tuple& tuple,  // We only need this so we can access the element types
+    std::vector<MYSQL_BIND>* const,
+    std::vector<std::vector<char>>* const,
+    typename OutputBinderNamespace::int_<-1>
+);
+// C++11 doesn't allow for partial template specialization of variadic
+// templated functions, but it does of classes, so wrap this function in a
+// class
+template <typename T>
+class OutputBinderParameterSetter
+{
+public:
+    /**
+     * Default setter for non-specialized types using Boost lexical_cast. If
+     * the type doesn't have a specialization, just set it to the string type.
+     * MySQL will convert the value to a string and we'll use Boost
+     * lexical_cast to convert it back later.
+     */
+    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer)
+    {
+        bind->buffer_type = MYSQL_TYPE_STRING;
+        buffer->resize(20);  // This seems like a reasonable default
+        bind->buffer = &(buffer->at(0));
+        bind->is_null = 0;
+        bind->buffer_length = buffer->size();
+    }
 };
 
 
@@ -102,26 +149,23 @@ void OutputBinder<Args...>::setResults(
 
     std::vector<MYSQL_BIND> parameters;
     parameters.resize(fieldCount);
-    std::vector<std::vector<char>> buffers(
-        fieldCount,
-        std::vector<char>(' ', 20)
-    );
+    std::vector<std::vector<char>> buffers;
+    buffers.resize(fieldCount);
     std::vector<uint64_t> lengths;
     lengths.resize(fieldCount);
 
-    // So, normally you would just bind each type to a buffer specific to that
-    // type, e.g. &int for INTs and char* for VARCHAR, but if someone gives me
-    // a tuple with a std::string, I don't really know how to use that as a
-    // buffer, so for now I'll just use char* buffers and save everything and
-    // boost::lexical_cast to set the values.
+    // setBind needs to know the type of the tuples, and it does this by
+    // taking an example tuple, so just create a dummy
+    // TODO(bskari|2013-03-17) There has to be a better way than this
+    std::tuple<Args...> unused;
+    setBind(unused, &parameters, &buffers);
+
     for (size_t i = 0; i < buffers.size(); ++i)
     {
-        MYSQL_BIND& bind = parameters.at(i);
-        bind.buffer_type = MYSQL_TYPE_STRING;
-        bind.buffer = &(buffers.at(i).at(0));
-        bind.is_null = 0;
-        bind.buffer_length = buffers.at(i).size();
-        bind.length = &lengths.at(i);
+        // This doesn't need to be set on every type, but it won't hurt
+        // anything, and it will make the OutputBinderParameterSetter
+        // specializations simpler
+        parameters.at(i).length = &lengths.at(i);
     }
     if (0 != mysql_stmt_bind_result(statement_, &parameters.at(0)))
     {
@@ -187,12 +231,28 @@ void OutputBinder<Args...>::setResults(
 template <typename... Args>
 void OutputBinder<Args...>::setTuple(
     std::tuple<Args...>* tuple,
-    const std::vector<MYSQL_BIND>& bindParameters
+    const std::vector<MYSQL_BIND>& outputParameters
 )
 {
     setTupleElements(
         tuple,
-        bindParameters,
+        outputParameters,
+        OutputBinderNamespace::int_<sizeof...(Args) - 1>()
+    );
+}
+
+
+template <typename... Args>
+void OutputBinder<Args...>::setBind(
+    const std::tuple<Args...>& tuple,
+    std::vector<MYSQL_BIND>* const outputParameters,
+    std::vector<std::vector<char>>* const buffers
+)
+{
+    setBindElements(
+        tuple,
+        outputParameters,
+        buffers,
         OutputBinderNamespace::int_<sizeof...(Args) - 1>()
     );
 }
@@ -201,17 +261,17 @@ void OutputBinder<Args...>::setTuple(
 template<typename Tuple, int I>
 void setTupleElements(
     Tuple* const tuple,
-    const std::vector<MYSQL_BIND>& bindParameters,
+    const std::vector<MYSQL_BIND>& outputParameters,
     typename OutputBinderNamespace::int_<I>
 )
 {
     OutputBinderElementSetter<
         typename std::tuple_element<I, Tuple>::type
     > setter;
-    setter.setElement(&(std::get<I>(*tuple)), bindParameters.at(I));
+    setter.setElement(&(std::get<I>(*tuple)), outputParameters.at(I));
     setTupleElements(
         tuple,
-        bindParameters,
+        outputParameters,
         OutputBinderNamespace::int_<I - 1>()
     );
 }
@@ -227,13 +287,35 @@ void setTupleElements(
 }
 
 
-template <typename T>
-void OutputBinderElementSetter<T>::setElement(
-    T* const value,
-    const MYSQL_BIND& bind
+template<typename Tuple, int I>
+static void setBindElements(
+    const Tuple& tuple,  // We only need this so we can access the element types
+    std::vector<MYSQL_BIND>* const bindParameters,
+    std::vector<std::vector<char>>* const buffers,
+    typename OutputBinderNamespace::int_<I>
 )
 {
-    *value = boost::lexical_cast<T>(static_cast<char*>(bind.buffer));
+    OutputBinderParameterSetter<
+        typename std::tuple_element<I, Tuple>::type
+    > setter;
+    setter.setParameter(&bindParameters->at(I), &buffers->at(I));
+    setBindElements(
+        tuple,
+        bindParameters,
+        buffers,
+        typename OutputBinderNamespace::int_<I - 1>()
+    );
+}
+
+
+template<typename Tuple>
+static void setBindElements(
+    const Tuple&,  // We only need this so we can access the element types
+    std::vector<MYSQL_BIND>* const,
+    std::vector<std::vector<char>>* const,
+    typename OutputBinderNamespace::int_<-1>
+)
+{
 }
 
 
