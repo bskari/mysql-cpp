@@ -60,7 +60,10 @@ public:
     void runQuery(
         std::vector<std::tuple<OutputArgs...>>* const results,
         const char* const query,
-        InputArgs... args
+        // Args needs to be sent by reference, because the values need to be
+        // nontemporary (that is, lvalues) so that their memory locations can
+        // be bound to MySQL's prepared statement API
+        const InputArgs&... args
     );
 
     /**
@@ -73,7 +76,10 @@ public:
     template<typename... Args>
     my_ulonglong runCommand(
         const char* const command,
-        Args... args
+        // Args needs to be sent by reference, because the values need to be
+        // nontemporary (that is, lvalues) so that their memory locations can
+        // be bound to MySQL's prepared statement API
+        const Args&... args
     );
     my_ulonglong runCommand(const char* const command);
 
@@ -112,7 +118,7 @@ private:
 template<typename... Args>
 my_ulonglong MySql::runCommand(
     const char* const command,
-    Args... args
+    const Args&... args
 )
 {
     MYSQL_STMT* const statement = mysql_stmt_init(connection_);
@@ -178,7 +184,7 @@ template<typename... InputArgs, typename... OutputArgs>
 void MySql::runQuery(
     std::vector<std::tuple<OutputArgs...>>* const results,
     const char* const query,
-    InputArgs... args
+    const InputArgs&... args
 )
 {
     assert(nullptr != results);

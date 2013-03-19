@@ -62,15 +62,24 @@ int main(int argc, char* argv[])
     // ************
     // Easy inserts
     // ************
+    int ages[] = {27, 21, 26};
+    cout << "Ages is at " << &ages[0] << endl;
+    string emails[] = {
+        "bskari@yelp.com",
+        "brandon.skari@gmail.com",
+        "brandon@skari.org"
+    };
+    string passwords[] = {
+        "peace",
+        "love",
+        "griffin"
+    };
     conn.runCommand(
         "INSERT INTO user (email, password, age)"
-            " VALUES (?, ?, ?), (?, ?, ?)",
-        "brandon.skari@gmail.com",
-        "peace",
-        21,
-        "brandon@skari.org",
-        "love",
-        26
+            " VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)",
+        emails[0], passwords[0], ages[0],
+        emails[1], passwords[1], ages[1],
+        emails[2], passwords[2], ages[2]
     );
 
     typedef tuple<int, string, string, int> userTuple;
@@ -79,18 +88,12 @@ int main(int argc, char* argv[])
     // All commands use safe prepared statements
     // *****************************************
     const string naughtyUser("brandon@skari.org'; DROP TABLE users; -- ");
-    conn.runQuery(
-        &users,
-        "SELECT * FROM user WHERE email = ?",
-        naughtyUser
-    );
+    conn.runQuery(&users, "SELECT * FROM user WHERE email = ?", naughtyUser);
     assert(0 == users.size());
 
-    conn.runQuery(
-        &users,
-        "SELECT * FROM user WHERE email = ?",
-        " something' OR 'dummy' = 'dummy"
-    );
+    const char naughtyUser2[] = "something' OR '1' = 1' --  ";
+    const char* charPtr = naughtyUser2;
+    conn.runQuery(&users, "SELECT * FROM user WHERE email = ?", charPtr);
     assert(0 == users.size());
 
     // ***************************

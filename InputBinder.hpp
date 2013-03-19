@@ -25,8 +25,8 @@ struct InputBinder<N, Head, Tail...>
     // template specialized instances defined for them instead.
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
-        Head value,
-        Tail... tail
+        const Head& value,
+        const Tail&... tail
     );
 };
 
@@ -40,7 +40,7 @@ struct InputBinder<N, const char*, Tail...>
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const char* const& value,
-        Tail... tail
+        const Tail&... tail
     )
     {
         // Set up the bind parameters
@@ -65,7 +65,7 @@ struct InputBinder<N, char*&, Tail...>
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const char* const& value,
-        Tail... tail
+        const Tail&... tail
     )
     {
         bind(bindParameters, value, tail...);
@@ -82,7 +82,7 @@ struct InputBinder<N, std::string, Tail...>
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const std::string& value,
-        Tail... tail
+        const Tail&... tail
     )
     {
         // Set up the bind parameters
@@ -103,16 +103,16 @@ struct InputBinder<N, std::string, Tail...>
 };
 
 
-// ********************************************
+// *******************************************
 // Partial template specialization for int32_t
-// ********************************************
+// *******************************************
 template <size_t N, typename... Tail>
 struct InputBinder<N, int32_t, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const int32_t& value,
-        Tail... tail
+        const Tail&... tail
     )
     {
         // Set up the bind parameters
@@ -140,7 +140,7 @@ struct InputBinder<N, uint32_t, Tail...>
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const uint32_t& value,
-        Tail... tail
+        const Tail&... tail
     )
     {
         // Set up the bind parameters
@@ -159,16 +159,16 @@ struct InputBinder<N, uint32_t, Tail...>
 };
 
 
-// ********************************************
+// *******************************************
 // Partial template specialization for int16_t
-// ********************************************
+// *******************************************
 template <size_t N, typename... Tail>
 struct InputBinder<N, int16_t, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const int16_t& value,
-        Tail... tail
+        const Tail&... tail
     )
     {
         // Set up the bind parameters
@@ -196,7 +196,7 @@ struct InputBinder<N, uint16_t, Tail...>
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const uint16_t& value,
-        Tail... tail
+        const Tail&... tail
     )
     {
         // Set up the bind parameters
@@ -215,16 +215,16 @@ struct InputBinder<N, uint16_t, Tail...>
 };
 
 
-// ********************************************
+// ******************************************
 // Partial template specialization for int8_t
-// ********************************************
+// ******************************************
 template <size_t N, typename... Tail>
 struct InputBinder<N, int8_t, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const int8_t& value,
-        Tail... tail
+        const Tail&... tail
     )
     {
         // Set up the bind parameters
@@ -243,16 +243,16 @@ struct InputBinder<N, int8_t, Tail...>
 };
 
 
-// ********************************************
+// *******************************************
 // Partial template specialization for uint8_t
-// ********************************************
+// *******************************************
 template <size_t N, typename... Tail>
 struct InputBinder<N, uint8_t, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const uint8_t& value,
-        Tail... tail
+        const Tail&... tail
     )
     {
         // Set up the bind parameters
@@ -271,16 +271,16 @@ struct InputBinder<N, uint8_t, Tail...>
 };
 
 
-// ********************************************
+// *****************************************
 // Partial template specialization for float
-// ********************************************
+// *****************************************
 template <size_t N, typename... Tail>
 struct InputBinder<N, float, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const float& value,
-        Tail... tail
+        const Tail&... tail
     )
     {
         static_assert(4 == sizeof(float), "Unexpected float size");
@@ -300,16 +300,16 @@ struct InputBinder<N, float, Tail...>
 };
 
 
-// ********************************************
+// ******************************************
 // Partial template specialization for double
-// ********************************************
+// ******************************************
 template <size_t N, typename... Tail>
 struct InputBinder<N, double, Tail...>
 {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const double& value,
-        Tail... tail
+        const Tail&... tail
     )
     {
         static_assert(8 == sizeof(double), "Unexpected double size");
