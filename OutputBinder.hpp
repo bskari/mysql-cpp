@@ -39,6 +39,12 @@ private:
         std::vector<std::vector<char>>* const buffers
     );
 
+    inline void refetchTruncatedColumns(
+        std::vector<MYSQL_BIND>* const parameters,
+        std::vector<std::vector<char>>* const buffers,
+        std::vector<uint64_t>* const lengths
+    );
+
     MYSQL_STMT* const statement_;
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 4)
@@ -64,9 +70,8 @@ static void setTupleElements(
     const std::vector<MYSQL_BIND>& bindParameters,
     typename OutputBinderNamespace::int_<-1>
 );
-// C++11 doesn't allow for partial template specialization of variadic
-// templated functions, but it does of classes, so wrap this function in a
-// class
+// Keep this in a templated class instead of just defining function overloads
+// so that we don't get unused function warnings
 template <typename T>
 class OutputBinderElementSetter
 {
@@ -74,10 +79,7 @@ public:
     /**
      * Default setter for non-specialized types using Boost lexical_cast.
      */
-    static void setElement(T* const value, const MYSQL_BIND& bind)
-    {
-        *value = boost::lexical_cast<T>(static_cast<char*>(bind.buffer));
-    }
+    static void setElement(T* const value, const MYSQL_BIND& bind);
 };
 
 
@@ -95,9 +97,8 @@ static void setBindElements(
     std::vector<std::vector<char>>* const,
     typename OutputBinderNamespace::int_<-1>
 );
-// C++11 doesn't allow for partial template specialization of variadic
-// templated functions, but it does of classes, so wrap this function in a
-// class
+// Keep this in a templated class instead of just defining function overloads
+// so that we don't get unused function warnings
 template <typename T>
 class OutputBinderParameterSetter
 {
@@ -108,14 +109,7 @@ public:
      * MySQL will convert the value to a string and we'll use Boost
      * lexical_cast to convert it back later.
      */
-    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer)
-    {
-        bind->buffer_type = MYSQL_TYPE_STRING;
-        buffer->resize(20);  // This seems like a reasonable default
-        bind->buffer = &(buffer->at(0));
-        bind->is_null = 0;
-        bind->buffer_length = buffer->size();
-    }
+    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer);
 };
 
 
@@ -149,6 +143,9 @@ void OutputBinder<Args...>::setResults(
 
     std::vector<MYSQL_BIND> parameters;
     parameters.resize(fieldCount);
+    // TODO(bskari|2013-03-18) Is this necessary, or will the defaulted C++
+    // constructor for MYSQL_BIND handle it?
+    memset(&parameters.at(0), 0, sizeof(parameters.at(0)) * parameters.size());
     std::vector<std::vector<char>> buffers;
     buffers.resize(fieldCount);
     std::vector<uint64_t> lengths;
@@ -186,9 +183,7 @@ void OutputBinder<Args...>::setResults(
     {
         if (MYSQL_DATA_TRUNCATED == fetchStatus)
         {
-            // TODO(bskari|2013-03-17) Rebind to a larger buffer and refetch
-            fetchStatus = mysql_stmt_fetch(statement_);
-            continue;
+            refetchTruncatedColumns(&parameters, &buffers, &lengths);
         }
 
         std::tuple<Args...> rowTuple;
@@ -258,6 +253,85 @@ void OutputBinder<Args...>::setBind(
 }
 
 
+template <typename... Args>
+void OutputBinder<Args...>::refetchTruncatedColumns(
+    std::vector<MYSQL_BIND>* const parameters,
+    std::vector<std::vector<char>>* const buffers,
+    std::vector<uint64_t>* const lengths
+)
+{
+    // Find which buffers were too small, expand them and refetch
+    std::vector<std::tuple<size_t, size_t>> truncatedColumns;
+    for (size_t i = 0; i < lengths->size(); ++i)
+    {
+        std::vector<char>& buffer = buffers->at(i);
+        const size_t untruncatedLength = lengths->at(i);
+        if (untruncatedLength > buffer.size())
+        {
+            // Only refetch the part that we didn't get the first time
+            const size_t alreadyRetrieved = buffer.size();
+            truncatedColumns.push_back(
+                std::tuple<size_t, size_t>(i, alreadyRetrieved)
+            );
+            buffer.resize(untruncatedLength + 1);
+            MYSQL_BIND& bind = parameters->at(i);
+            bind.buffer = &buffer.at(alreadyRetrieved);
+            bind.buffer_length = buffer.size() - alreadyRetrieved - 1;
+        }
+    }
+
+    // I'm not sure why, but I occasionally get the truncated status
+    // code when nothing was truncated... so just break out?
+    if (truncatedColumns.empty())
+    {
+        // No truncations!
+        return;
+    }
+
+    // Refetch only the data that were truncated
+    const std::vector<std::tuple<size_t, size_t>>::const_iterator end(
+        truncatedColumns.end()
+    );
+    for (
+        std::vector<std::tuple<size_t, size_t>>::const_iterator i(
+            truncatedColumns.begin()
+        );
+        i != end;
+        ++i
+    )
+    {
+        const size_t column = std::get<0>(*i);
+        const size_t offset = std::get<1>(*i);
+        MYSQL_BIND& parameter = parameters->at(column);
+        const int status = mysql_stmt_fetch_column(
+            statement_,
+            &parameter,
+            column,
+            offset
+        );
+        if (0 != status)
+        {
+            MySqlException mse(mysql_stmt_error(statement_));
+            mysql_stmt_close(statement_);
+            throw mse;
+        }
+
+        // Now, for subsequent fetches, we need to reset the buffers
+        std::vector<char>& buffer = buffers->at(column);
+        parameter.buffer = &buffer.at(0);
+        parameter.buffer_length = buffer.size();
+    }
+
+    // If we've changed the buffers, we need to rebind
+    if (0 != mysql_stmt_bind_result(statement_, &parameters->at(0)))
+    {
+        MySqlException mse(mysql_stmt_error(statement_));
+        mysql_stmt_close(statement_);
+        throw mse;
+    }
+}
+
+
 template<typename Tuple, int I>
 void setTupleElements(
     Tuple* const tuple,
@@ -319,6 +393,14 @@ static void setBindElements(
 }
 
 
+template <typename T>
+void OutputBinderElementSetter<T>::setElement(
+    T* const value,
+    const MYSQL_BIND& bind
+)
+{
+    *value = boost::lexical_cast<T>(static_cast<char*>(bind.buffer));
+}
 // ****************************************************
 // Partial template specializations for element setters
 // ****************************************************
@@ -328,10 +410,7 @@ template <> \
 class OutputBinderElementSetter<type> \
 { \
 public: \
-    void setElement( \
-        type* const value, \
-        const MYSQL_BIND& bind \
-    ) \
+    void setElement(type* const value, const MYSQL_BIND& bind) \
     { \
         *value = *static_cast<const decltype(value)>(bind.buffer); \
     } \
@@ -347,6 +426,24 @@ OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int64_t)
 OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint64_t)
 
 
+template <typename T>
+void OutputBinderParameterSetter<T>::setParameter(
+    MYSQL_BIND* bind,
+    std::vector<char>* buffer
+)
+{
+    bind->buffer_type = MYSQL_TYPE_STRING;
+    if (0 == buffer->size())
+    {
+        // This seems like a reasonable default. If the buffer is
+        // non-empty, then it's probably been expanded to fit accomodate
+        // some truncated data, so don't mess with it.
+        buffer->resize(20);
+    }
+    bind->buffer = &(buffer->at(0));
+    bind->is_null = 0;
+    bind->buffer_length = buffer->size();
+}
 // *************************************************
 // Partial template specializations for bind setters
 // *************************************************
