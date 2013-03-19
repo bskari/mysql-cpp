@@ -63,7 +63,6 @@ int main(int argc, char* argv[])
     // Easy inserts
     // ************
     int ages[] = {27, 21, 26};
-    cout << "Ages is at " << &ages[0] << endl;
     string emails[] = {
         "bskari@yelp.com",
         "brandon.skari@gmail.com",

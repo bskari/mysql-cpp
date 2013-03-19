@@ -424,6 +424,17 @@ OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int32_t)
 OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint32_t)
 OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int64_t)
 OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint64_t)
+template<>
+class OutputBinderElementSetter<std::string>
+{
+public:
+    void setElement(std::string* const value, const MYSQL_BIND& bind)
+    {
+        // Strings have an operator= for char*, so we can skip the lexical_cast
+        // and just call this directly
+        *value = static_cast<const char*>(bind.buffer);
+    }
+};
 
 
 template <typename T>
