@@ -161,6 +161,13 @@ int main(int argc, char* argv[])
         cout << ")" << endl;
     }
 
+
+    // *********************************************
+    // Raw pointers are gross, so this won't compile
+    // *********************************************
+    vector<tuple<int*>> rawPointers;
+    conn.runQuery(&rawPointers, "SELECT age FROM user");
+
     // **************************************
     // Look at all these type-based failures!
     // **************************************

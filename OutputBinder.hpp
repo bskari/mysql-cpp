@@ -99,6 +99,12 @@ public:
         const MYSQL_BIND& bind
     );
 };
+template<typename T>
+class OutputBinderElementSetter<T*>
+{
+public:
+    static void setElement(T* const, const MYSQL_BIND&);
+};
 
 
 template<typename Tuple, int I>
@@ -143,6 +149,16 @@ public:
         MYSQL_BIND* const bind,
         std::vector<char>* const buffer,
         my_bool* const isNullFlag
+    );
+};
+template<typename T>
+class OutputBinderParameterSetter<T*>
+{
+public:
+    static void setParameter(
+        MYSQL_BIND* const,
+        std::vector<char>* const,
+        my_bool* const
     );
 };
 
@@ -480,6 +496,17 @@ void OutputBinderElementSetter<std::shared_ptr<T>>::setElement(
         *value = std::make_shared<T>(newObject);
     }
 }
+// *******************************************************
+// Partial specialization for pointer types for setElement
+// *******************************************************
+template<typename T>
+void OutputBinderElementSetter<T*>::setElement(T* const, const MYSQL_BIND&)
+{
+    static_assert(
+        false,
+        "Raw pointers are not suppoorted; use std::shared_ptr instead"
+    );
+}
 // ***********************************
 // Full specializations for setElement
 // ***********************************
@@ -564,6 +591,21 @@ void OutputBinderParameterSetter<std::shared_ptr<T>>::setParameter(
     // Just forward to the ful specialization
     OutputBinderParameterSetter<T> setter;
     setter.setParameter(bind, buffer, isNullFlag);
+}
+// *********************************************************
+// Partial specialization for pointer types for setParameter
+// *********************************************************
+template<typename T>
+void OutputBinderParameterSetter<T*>::setParameter(
+    MYSQL_BIND* const,
+    std::vector<char>* const,
+    my_bool* const
+)
+{
+    static_assert(
+        false,
+        "Raw pointers are not suppoorted; use std::shared_ptr instead"
+    );
 }
 // *************************************
 // Full specializations for setParameter
