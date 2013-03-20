@@ -6,10 +6,15 @@
 #include <boost/lexical_cast.hpp>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <mysql/mysql.h>
 #include <string>
 #include <tuple>
 #include <vector>
+
+
+static const char NULL_VALUE_ERROR_MESSAGE[] = \
+    "Null value encountered with non-shared_ptr output type";
 
 
 template <typename... Args>
@@ -36,7 +41,8 @@ private:
     static void setBind(
         const std::tuple<Args...>& tuple,
         std::vector<MYSQL_BIND>* const outputParameters,
-        std::vector<std::vector<char>>* const buffers
+        std::vector<std::vector<char>>* const buffers,
+        std::vector<my_bool>* const nullFlags
     );
 
     inline void refetchTruncatedColumns(
@@ -79,7 +85,19 @@ public:
     /**
      * Default setter for non-specialized types using Boost lexical_cast.
      */
-    static void setElement(T* const value, const MYSQL_BIND& bind);
+    static void setElement(
+        T* const value,
+        const MYSQL_BIND& bind
+    );
+};
+template<typename T>
+class OutputBinderElementSetter<std::shared_ptr<T>>
+{
+public:
+    static void setElement(
+        std::shared_ptr<T>* const value,
+        const MYSQL_BIND& bind
+    );
 };
 
 
@@ -88,6 +106,7 @@ static void setBindElements(
     const Tuple& tuple,  // We only need this so we can access the element types
     std::vector<MYSQL_BIND>* const bindParameters,
     std::vector<std::vector<char>>* const buffers,
+    std::vector<my_bool> const nullFlags,
     typename OutputBinderNamespace::int_<I>
 );
 template<typename Tuple>
@@ -95,6 +114,7 @@ static void setBindElements(
     const Tuple& tuple,  // We only need this so we can access the element types
     std::vector<MYSQL_BIND>* const,
     std::vector<std::vector<char>>* const,
+    std::vector<my_bool> const,
     typename OutputBinderNamespace::int_<-1>
 );
 // Keep this in a templated class instead of just defining function overloads
@@ -111,7 +131,18 @@ public:
      */
     static void setParameter(
         MYSQL_BIND* const bind,
-        std::vector<char>* const buffer
+        std::vector<char>* const buffer,
+        my_bool* const isNullFlag
+    );
+};
+template<typename T>
+class OutputBinderParameterSetter<std::shared_ptr<T>>
+{
+public:
+    static void setParameter(
+        MYSQL_BIND* const bind,
+        std::vector<char>* const buffer,
+        my_bool* const isNullFlag
     );
 };
 
@@ -140,7 +171,7 @@ void OutputBinder<Args...>::setResults(
         errorMessage += boost::lexical_cast<std::string>(fieldCount);
         errorMessage += " but ";
         errorMessage += boost::lexical_cast<std::string>(sizeof...(Args));
-        errorMessage += " parameters were provided.";
+        errorMessage += " parameters were provided";
         throw MySqlException(errorMessage);
     }
 
@@ -153,12 +184,14 @@ void OutputBinder<Args...>::setResults(
     buffers.resize(fieldCount);
     std::vector<uint64_t> lengths;
     lengths.resize(fieldCount);
+    std::vector<my_bool> nullFlags;
+    nullFlags.resize(fieldCount);
 
     // setBind needs to know the type of the tuples, and it does this by
     // taking an example tuple, so just create a dummy
     // TODO(bskari|2013-03-17) There has to be a better way than this
     std::tuple<Args...> unused;
-    setBind(unused, &parameters, &buffers);
+    setBind(unused, &parameters, &buffers, &nullFlags);
 
     for (size_t i = 0; i < buffers.size(); ++i)
     {
@@ -244,13 +277,15 @@ template <typename... Args>
 void OutputBinder<Args...>::setBind(
     const std::tuple<Args...>& tuple,
     std::vector<MYSQL_BIND>* const outputParameters,
-    std::vector<std::vector<char>>* const buffers
+    std::vector<std::vector<char>>* const buffers,
+    std::vector<my_bool>* const nullFlags
 )
 {
     setBindElements(
         tuple,
         outputParameters,
         buffers,
+        nullFlags,
         OutputBinderNamespace::int_<sizeof...(Args) - 1>()
     );
 }
@@ -369,17 +404,23 @@ static void setBindElements(
     const Tuple& tuple,  // We only need this so we can access the element types
     std::vector<MYSQL_BIND>* const bindParameters,
     std::vector<std::vector<char>>* const buffers,
+    std::vector<my_bool>* const nullFlags,
     typename OutputBinderNamespace::int_<I>
 )
 {
     OutputBinderParameterSetter<
         typename std::tuple_element<I, Tuple>::type
     > setter;
-    setter.setParameter(&bindParameters->at(I), &buffers->at(I));
+    setter.setParameter(
+        &bindParameters->at(I),
+        &buffers->at(I),
+        &nullFlags->at(I)
+    );
     setBindElements(
         tuple,
         bindParameters,
         buffers,
+        nullFlags,
         typename OutputBinderNamespace::int_<I - 1>()
     );
 }
@@ -390,6 +431,7 @@ static void setBindElements(
     const Tuple&,  // We only need this so we can access the element types
     std::vector<MYSQL_BIND>* const,
     std::vector<std::vector<char>>* const,
+    std::vector<my_bool>* const,
     typename OutputBinderNamespace::int_<-1>
 )
 {
@@ -402,19 +444,60 @@ void OutputBinderElementSetter<T>::setElement(
     const MYSQL_BIND& bind
 )
 {
+    // Null values only be encountered with shared_ptr output variables, and
+    // those are handled in a partial template specialization, so if we see
+    // one here, it's unexpected and an error
+    if (*bind.is_null)
+    {
+        throw MySqlException(NULL_VALUE_ERROR_MESSAGE);
+    }
     *value = boost::lexical_cast<T>(static_cast<char*>(bind.buffer));
 }
-// ****************************************************
-// Partial template specializations for element setters
-// ****************************************************
+// **********************************************************
+// Partial specialization for shared_ptr types for setElement
+// **********************************************************
+template<typename T>
+void OutputBinderElementSetter<std::shared_ptr<T>>::setElement(
+    std::shared_ptr<T>* const value,
+    const MYSQL_BIND& bind
+)
+{
+    if (*bind.is_null)
+    {
+        // Remove object (if any)
+        value->reset();
+    }
+    else
+    {
+        // Fall through to the non-shared_ptr version
+        // TODO(bskari|2013-03-13) We shouldn't need to allocate a new object,
+        // send it to a non-shared_ptr instance of setElement, and then make a
+        // copy of it. Refactor this delegation stuff out so that falling
+        // through is cleaner.
+        T newObject;
+        OutputBinderElementSetter<T> setter;
+        setter.setElement(&newObject, bind);
+        *value = std::make_shared<T>(newObject);
+    }
+}
+// ***********************************
+// Full specializations for setElement
+// ***********************************
 #ifndef OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION
 #define OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(type) \
 template <> \
 class OutputBinderElementSetter<type> \
 { \
 public: \
-    void setElement(type* const value, const MYSQL_BIND& bind) \
+    void setElement( \
+        type* const value, \
+        const MYSQL_BIND& bind \
+    ) \
     { \
+        if (*bind.is_null) \
+        { \
+            throw MySqlException(NULL_VALUE_ERROR_MESSAGE); \
+        } \
         *value = *static_cast<const decltype(value)>(bind.buffer); \
     } \
 };
@@ -433,8 +516,15 @@ template<>
 class OutputBinderElementSetter<std::string>
 {
 public:
-    void setElement(std::string* const value, const MYSQL_BIND& bind)
+    void setElement(
+        std::string* const value,
+        const MYSQL_BIND& bind
+    )
     {
+        if (*bind.is_null)
+        {
+            throw MySqlException(NULL_VALUE_ERROR_MESSAGE);
+        }
         // Strings have an operator= for char*, so we can skip the lexical_cast
         // and just call this directly
         *value = static_cast<const char*>(bind.buffer);
@@ -444,8 +534,9 @@ public:
 
 template <typename T>
 void OutputBinderParameterSetter<T>::setParameter(
-    MYSQL_BIND* bind,
-    std::vector<char>* buffer
+    MYSQL_BIND* const bind,
+    std::vector<char>* const buffer,
+    my_bool* const isNullFlag
 )
 {
     bind->buffer_type = MYSQL_TYPE_STRING;
@@ -457,24 +548,42 @@ void OutputBinderParameterSetter<T>::setParameter(
         buffer->resize(20);
     }
     bind->buffer = &(buffer->at(0));
-    bind->is_null = 0;
+    bind->is_null = isNullFlag;
     bind->buffer_length = buffer->size();
 }
-// *************************************************
-// Partial template specializations for bind setters
-// *************************************************
+// ************************************************************
+// Partial specialization for shared_ptr types for setParameter
+// ************************************************************
+template<typename T>
+void OutputBinderParameterSetter<std::shared_ptr<T>>::setParameter(
+    MYSQL_BIND* const bind,
+    std::vector<char>* const buffer,
+    my_bool* const isNullFlag
+)
+{
+    // Just forward to the ful specialization
+    OutputBinderParameterSetter<T> setter;
+    setter.setParameter(bind, buffer, isNullFlag);
+}
+// *************************************
+// Full specializations for setParameter
+// *************************************
 #ifndef OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION
 #define OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(type, mysqlType, isUnsigned) \
 template <> \
 struct OutputBinderParameterSetter<type> \
 { \
 public: \
-    static void setParameter(MYSQL_BIND* const bind, std::vector<char>* const buffer) \
+    static void setParameter( \
+        MYSQL_BIND* const bind, \
+        std::vector<char>* const buffer, \
+        my_bool* const isNullFlag \
+    ) \
     { \
         bind->buffer_type = mysqlType; \
         buffer->resize(sizeof(type)); \
         bind->buffer = &(buffer->at(0)); \
-        bind->is_null = 0; \
+        bind->is_null = isNullFlag; \
         bind->is_unsigned = isUnsigned; \
     } \
 };
