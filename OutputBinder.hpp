@@ -1,15 +1,15 @@
 #ifndef OUTPUTBINDER_HPP_
 #define OUTPUTBINDER_HPP_
 
+#include "MySqlException.hpp"
+
+#include <boost/lexical_cast.hpp>
 #include <cstdint>
 #include <cstring>
 #include <mysql/mysql.h>
-
 #include <string>
 #include <tuple>
 #include <vector>
-
-#include "MySqlException.hpp"
 
 
 template <typename... Args>
@@ -19,7 +19,7 @@ public:
     OutputBinder(MYSQL_STMT* const statement);
 
     // This should just be combined into the constructor
-    void setResults(std::vector<std::tuple<Args...>>* results);
+    void setResults(std::vector<std::tuple<Args...>>* const results);
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
     // Deleted and defaulted constructors are supported in GCC 4.4
@@ -30,7 +30,7 @@ public:
 
 private:
     static void setTuple(
-        std::tuple<Args...>* tuple,
+        std::tuple<Args...>* const tuple,
         const std::vector<MYSQL_BIND>& bindParameters
     );
     static void setBind(
@@ -109,7 +109,10 @@ public:
      * MySQL will convert the value to a string and we'll use Boost
      * lexical_cast to convert it back later.
      */
-    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer);
+    static void setParameter(
+        MYSQL_BIND* const bind,
+        std::vector<char>* const buffer
+    );
 };
 
 
@@ -122,7 +125,7 @@ OutputBinder<Args...>::OutputBinder(MYSQL_STMT* const statement)
 
 template <typename... Args>
 void OutputBinder<Args...>::setResults(
-    std::vector<std::tuple<Args...>>* results
+    std::vector<std::tuple<Args...>>* const results
 )
 {
     // Bind the output parameters
@@ -225,7 +228,7 @@ void OutputBinder<Args...>::setResults(
 
 template <typename... Args>
 void OutputBinder<Args...>::setTuple(
-    std::tuple<Args...>* tuple,
+    std::tuple<Args...>* const tuple,
     const std::vector<MYSQL_BIND>& outputParameters
 )
 {
@@ -424,6 +427,8 @@ OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int32_t)
 OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint32_t)
 OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int64_t)
 OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint64_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(float)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(double)
 template<>
 class OutputBinderElementSetter<std::string>
 {
@@ -464,7 +469,7 @@ template <> \
 struct OutputBinderParameterSetter<type> \
 { \
 public: \
-    static void setParameter(MYSQL_BIND* bind, std::vector<char>* buffer) \
+    static void setParameter(MYSQL_BIND* const bind, std::vector<char>* const buffer) \
     { \
         bind->buffer_type = mysqlType; \
         buffer->resize(sizeof(type)); \
@@ -474,14 +479,16 @@ public: \
     } \
 };
 #endif
-OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int8_t, MYSQL_TYPE_TINY, 0)
-OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint8_t, MYSQL_TYPE_TINY, 1)
-OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int16_t, MYSQL_TYPE_TINY, 0)
-OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint16_t, MYSQL_TYPE_TINY, 1)
-OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int32_t, MYSQL_TYPE_TINY, 0)
-OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint32_t, MYSQL_TYPE_TINY, 1)
-OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int64_t, MYSQL_TYPE_TINY, 0)
-OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint64_t, MYSQL_TYPE_TINY, 1)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int8_t,   MYSQL_TYPE_TINY,     0)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint8_t,  MYSQL_TYPE_TINY,     1)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int16_t,  MYSQL_TYPE_SHORT,    0)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint16_t, MYSQL_TYPE_SHORT,    1)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int32_t,  MYSQL_TYPE_LONG,     0)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint32_t, MYSQL_TYPE_LONG,     1)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int64_t,  MYSQL_TYPE_LONGLONG, 0)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint64_t, MYSQL_TYPE_LONGLONG, 1)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(float,    MYSQL_TYPE_FLOAT,    0)
+OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(double,   MYSQL_TYPE_DOUBLE,   0)
 
 
 #endif  // OUTPUTBINDER_HPP_
