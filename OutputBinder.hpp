@@ -4,6 +4,7 @@
 #include "MySqlException.hpp"
 
 #include <boost/lexical_cast.hpp>
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -23,7 +24,9 @@ class OutputBinder
 public:
     OutputBinder(MYSQL_STMT* const statement);
 
-    // This should just be combined into the constructor
+    // Should this just be combined into the constructor? On one hand,
+    // creating an instance of this class and then not calling any methods
+    // from it seems weird.
     void setResults(std::vector<std::tuple<Args...>>* const results);
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
@@ -34,17 +37,6 @@ public:
 #endif
 
 private:
-    static void setTuple(
-        std::tuple<Args...>* const tuple,
-        const std::vector<MYSQL_BIND>& bindParameters
-    );
-    static void setBind(
-        const std::tuple<Args...>& tuple,
-        std::vector<MYSQL_BIND>* const outputParameters,
-        std::vector<std::vector<char>>* const buffers,
-        std::vector<my_bool>* const nullFlags
-    );
-
     inline void refetchTruncatedColumns(
         std::vector<MYSQL_BIND>* const parameters,
         std::vector<std::vector<char>>* const buffers,
@@ -65,58 +57,58 @@ namespace OutputBinderNamespace {
     template<int I> struct int_{};  // Compile-time counter
 }
 template<typename Tuple, int I>
-static void setTupleElements(
+static void setResultTuple(
     Tuple* const tuple,
-    const std::vector<MYSQL_BIND>& bindParameters,
+    const std::vector<MYSQL_BIND>& mysqlBindParameters,
     typename OutputBinderNamespace::int_<I>
 );
 template<typename Tuple>
-static void setTupleElements(
+static void setResultTuple(
     Tuple* const tuple,
-    const std::vector<MYSQL_BIND>& bindParameters,
+    const std::vector<MYSQL_BIND>& mysqlBindParameters,
     typename OutputBinderNamespace::int_<-1>
 );
 // Keep this in a templated class instead of just defining function overloads
 // so that we don't get unused function warnings
 template <typename T>
-class OutputBinderElementSetter
+class OutputBinderResultSetter
 {
 public:
     /**
      * Default setter for non-specialized types using Boost lexical_cast.
      */
-    static void setElement(
+    static void setResult(
         T* const value,
         const MYSQL_BIND& bind
     );
 };
 template<typename T>
-class OutputBinderElementSetter<std::shared_ptr<T>>
+class OutputBinderResultSetter<std::shared_ptr<T>>
 {
 public:
-    static void setElement(
+    static void setResult(
         std::shared_ptr<T>* const value,
         const MYSQL_BIND& bind
     );
 };
 template<typename T>
-class OutputBinderElementSetter<T*>
+class OutputBinderResultSetter<T*>
 {
 public:
-    static void setElement(T** const, const MYSQL_BIND&);
+    static void setResult(T** const, const MYSQL_BIND&);
 };
 
 
 template<typename Tuple, int I>
-static void setBindElements(
+static void bindParameters(
     const Tuple& tuple,  // We only need this so we can access the element types
-    std::vector<MYSQL_BIND>* const bindParameters,
+    std::vector<MYSQL_BIND>* const mysqlBindParameters,
     std::vector<std::vector<char>>* const buffers,
     std::vector<my_bool> const nullFlags,
     typename OutputBinderNamespace::int_<I>
 );
 template<typename Tuple>
-static void setBindElements(
+static void bindParameters(
     const Tuple& tuple,  // We only need this so we can access the element types
     std::vector<MYSQL_BIND>* const,
     std::vector<std::vector<char>>* const,
@@ -203,11 +195,17 @@ void OutputBinder<Args...>::setResults(
     std::vector<my_bool> nullFlags;
     nullFlags.resize(fieldCount);
 
-    // setBind needs to know the type of the tuples, and it does this by
+    // bindParameters needs to know the type of the tuples, and it does this by
     // taking an example tuple, so just create a dummy
     // TODO(bskari|2013-03-17) There has to be a better way than this
     std::tuple<Args...> unused;
-    setBind(unused, &parameters, &buffers, &nullFlags);
+    bindParameters(
+        unused,
+        &parameters,
+        &buffers,
+        &nullFlags,
+        OutputBinderNamespace::int_<sizeof...(Args) - 1>()
+    );
 
     for (size_t i = 0; i < buffers.size(); ++i)
     {
@@ -241,7 +239,11 @@ void OutputBinder<Args...>::setResults(
         std::tuple<Args...> rowTuple;
         try
         {
-            setTuple(&rowTuple, parameters);
+            setResultTuple(
+                &rowTuple,
+                parameters,
+                OutputBinderNamespace::int_<sizeof...(Args) - 1>()
+            );
         }
         catch (...)
         {
@@ -272,38 +274,6 @@ void OutputBinder<Args...>::setResults(
             throw mse;
         }
     }
-}
-
-
-template <typename... Args>
-void OutputBinder<Args...>::setTuple(
-    std::tuple<Args...>* const tuple,
-    const std::vector<MYSQL_BIND>& outputParameters
-)
-{
-    setTupleElements(
-        tuple,
-        outputParameters,
-        OutputBinderNamespace::int_<sizeof...(Args) - 1>()
-    );
-}
-
-
-template <typename... Args>
-void OutputBinder<Args...>::setBind(
-    const std::tuple<Args...>& tuple,
-    std::vector<MYSQL_BIND>* const outputParameters,
-    std::vector<std::vector<char>>* const buffers,
-    std::vector<my_bool>* const nullFlags
-)
-{
-    setBindElements(
-        tuple,
-        outputParameters,
-        buffers,
-        nullFlags,
-        OutputBinderNamespace::int_<sizeof...(Args) - 1>()
-    );
 }
 
 
@@ -387,17 +357,17 @@ void OutputBinder<Args...>::refetchTruncatedColumns(
 
 
 template<typename Tuple, int I>
-void setTupleElements(
+void setResultTuple(
     Tuple* const tuple,
     const std::vector<MYSQL_BIND>& outputParameters,
     typename OutputBinderNamespace::int_<I>
 )
 {
-    OutputBinderElementSetter<
+    OutputBinderResultSetter<
         typename std::tuple_element<I, Tuple>::type
     > setter;
-    setter.setElement(&(std::get<I>(*tuple)), outputParameters.at(I));
-    setTupleElements(
+    setter.setResult(&(std::get<I>(*tuple)), outputParameters.at(I));
+    setResultTuple(
         tuple,
         outputParameters,
         OutputBinderNamespace::int_<I - 1>()
@@ -406,7 +376,7 @@ void setTupleElements(
 
 
 template<typename Tuple>
-void setTupleElements(
+void setResultTuple(
     Tuple* const,
     const std::vector<MYSQL_BIND>&,
     typename OutputBinderNamespace::int_<-1>
@@ -416,9 +386,9 @@ void setTupleElements(
 
 
 template<typename Tuple, int I>
-static void setBindElements(
+static void bindParameters(
     const Tuple& tuple,  // We only need this so we can access the element types
-    std::vector<MYSQL_BIND>* const bindParameters,
+    std::vector<MYSQL_BIND>* const mysqlBindParameters,
     std::vector<std::vector<char>>* const buffers,
     std::vector<my_bool>* const nullFlags,
     typename OutputBinderNamespace::int_<I>
@@ -428,13 +398,13 @@ static void setBindElements(
         typename std::tuple_element<I, Tuple>::type
     > setter;
     setter.setParameter(
-        &bindParameters->at(I),
+        &mysqlBindParameters->at(I),
         &buffers->at(I),
         &nullFlags->at(I)
     );
-    setBindElements(
+    bindParameters(
         tuple,
-        bindParameters,
+        mysqlBindParameters,
         buffers,
         nullFlags,
         typename OutputBinderNamespace::int_<I - 1>()
@@ -443,7 +413,7 @@ static void setBindElements(
 
 
 template<typename Tuple>
-static void setBindElements(
+static void bindParameters(
     const Tuple&,  // We only need this so we can access the element types
     std::vector<MYSQL_BIND>* const,
     std::vector<std::vector<char>>* const,
@@ -455,7 +425,7 @@ static void setBindElements(
 
 
 template <typename T>
-void OutputBinderElementSetter<T>::setElement(
+void OutputBinderResultSetter<T>::setResult(
     T* const value,
     const MYSQL_BIND& bind
 )
@@ -470,10 +440,10 @@ void OutputBinderElementSetter<T>::setElement(
     *value = boost::lexical_cast<T>(static_cast<char*>(bind.buffer));
 }
 // **********************************************************
-// Partial specialization for shared_ptr types for setElement
+// Partial specialization for shared_ptr types for setResult
 // **********************************************************
 template<typename T>
-void OutputBinderElementSetter<std::shared_ptr<T>>::setElement(
+void OutputBinderResultSetter<std::shared_ptr<T>>::setResult(
     std::shared_ptr<T>* const value,
     const MYSQL_BIND& bind
 )
@@ -487,20 +457,20 @@ void OutputBinderElementSetter<std::shared_ptr<T>>::setElement(
     {
         // Fall through to the non-shared_ptr version
         // TODO(bskari|2013-03-13) We shouldn't need to allocate a new object,
-        // send it to a non-shared_ptr instance of setElement, and then make a
+        // send it to a non-shared_ptr instance of setResult, and then make a
         // copy of it. Refactor this delegation stuff out so that falling
         // through is cleaner.
         T newObject;
-        OutputBinderElementSetter<T> setter;
-        setter.setElement(&newObject, bind);
+        OutputBinderResultSetter<T> setter;
+        setter.setResult(&newObject, bind);
         *value = std::make_shared<T>(newObject);
     }
 }
 // *******************************************************
-// Partial specialization for pointer types for setElement
+// Partial specialization for pointer types for setResult
 // *******************************************************
 template<typename T>
-void OutputBinderElementSetter<T*>::setElement(T** const, const MYSQL_BIND&)
+void OutputBinderResultSetter<T*>::setResult(T** const, const MYSQL_BIND&)
 {
     static_assert(
         sizeof(T) == 0, // C++ guarantees that the sizeof any valid type != 0
@@ -508,15 +478,15 @@ void OutputBinderElementSetter<T*>::setElement(T** const, const MYSQL_BIND&)
     );
 }
 // ***********************************
-// Full specializations for setElement
+// Full specializations for setResult
 // ***********************************
 #ifndef OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION
 #define OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(type) \
 template <> \
-class OutputBinderElementSetter<type> \
+class OutputBinderResultSetter<type> \
 { \
 public: \
-    void setElement( \
+    void setResult( \
         type* const value, \
         const MYSQL_BIND& bind \
     ) \
@@ -540,10 +510,10 @@ OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint64_t)
 OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(float)
 OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(double)
 template<>
-class OutputBinderElementSetter<std::string>
+class OutputBinderResultSetter<std::string>
 {
 public:
-    void setElement(
+    void setResult(
         std::string* const value,
         const MYSQL_BIND& bind
     )
