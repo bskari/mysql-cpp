@@ -1,6 +1,9 @@
 #include "testInputBinder.hpp"
+#include "testOutputBinder.hpp"
 
 #include <boost/test/included/unit_test.hpp>
+#include <ctime>
+#include <cstdlib>
 #include <string>
 
 // Boost lets you name your tests, but I just want my tests to have the same
@@ -14,6 +17,9 @@ using std::string;
 
 test::test_suite* init_unit_test_suite(int, char*[])
 {
+    // Randomization in tests is bad!
+    srand(time(NULL));
+
     typedef void(*testFunction)(void);
     class FunctionDescription
     {
@@ -29,7 +35,10 @@ test::test_suite* init_unit_test_suite(int, char*[])
 
     FunctionDescription functions[] = {
         // Tests from testInputBinder.hpp
-        FD(testBind)
+        FD(testBind),
+        // Tests from testOutputBinder.hpp
+        FD(testSetResult),
+        FD(testSetParameter)
     };
 
     for (size_t i = 0; i < sizeof(functions) / sizeof(functions[0]); ++i)
