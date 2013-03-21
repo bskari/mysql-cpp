@@ -1,5 +1,4 @@
 #include <cassert>
-
 #include <iostream>
 #include <memory>
 #include <string>
@@ -165,8 +164,10 @@ int main(int argc, char* argv[])
     // *********************************************
     // Raw pointers are gross, so this won't compile
     // *********************************************
+    /*
     vector<tuple<int*>> rawPointers;
     conn.runQuery(&rawPointers, "SELECT age FROM user");
+    */
 
     // **************************************
     // Look at all these type-based failures!
@@ -189,7 +190,7 @@ int main(int argc, char* argv[])
 template<typename Char, typename Traits, typename Tuple, size_t I>
 void printTuple(basic_ostream<Char, Traits>& out, Tuple const& t, int_<I>)
 {
-    printTuple(out, t, int_<I-1>());
+    printTuple(out, t, int_<I - 1>());
     out << ", " << get<I>(t);
 }
 

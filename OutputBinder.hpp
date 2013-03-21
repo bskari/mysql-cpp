@@ -103,7 +103,7 @@ template<typename T>
 class OutputBinderElementSetter<T*>
 {
 public:
-    static void setElement(T* const, const MYSQL_BIND&);
+    static void setElement(T** const, const MYSQL_BIND&);
 };
 
 
@@ -500,10 +500,10 @@ void OutputBinderElementSetter<std::shared_ptr<T>>::setElement(
 // Partial specialization for pointer types for setElement
 // *******************************************************
 template<typename T>
-void OutputBinderElementSetter<T*>::setElement(T* const, const MYSQL_BIND&)
+void OutputBinderElementSetter<T*>::setElement(T** const, const MYSQL_BIND&)
 {
     static_assert(
-        false,
+        sizeof(T) == 0, // C++ guarantees that the sizeof any valid type != 0
         "Raw pointers are not suppoorted; use std::shared_ptr instead"
     );
 }
@@ -603,7 +603,7 @@ void OutputBinderParameterSetter<T*>::setParameter(
 )
 {
     static_assert(
-        false,
+        sizeof(T) == 0, // C++ guarantees that the sizeof any valid type != 0
         "Raw pointers are not suppoorted; use std::shared_ptr instead"
     );
 }
