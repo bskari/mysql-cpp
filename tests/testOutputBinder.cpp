@@ -45,20 +45,21 @@ void testSetResult()
     TYPE_TEST(uint64_t)
 
     {
-    string result(" ", 5);
-    vector<char> buffer(result.size());
-    for (size_t i = 0; i < result.size(); ++i)
-    {
-        // Let's avoid \0
-        buffer.at(i) = result.at(i) = (char)(rand() % 10 + 'a');
-    }
-    bind.buffer = &buffer.at(0);
-    bind.is_null = &nullFlag;
-    string output;
-    OutputBinderResultSetter<string> setter;
-    setter.setResult(&output, bind);
-    BOOST_CHECK(result.size() == output.size());
-    BOOST_CHECK(result == output);
+        string result(" ", 5);
+        vector<char> buffer(result.size());
+        for (size_t i = 0; i < result.size(); ++i)
+        {
+            // Let's avoid \0
+            buffer.at(i) = result.at(i) = (char)(rand() % 10 + 'a');
+        }
+        buffer.push_back('\0');
+        bind.buffer = &buffer.at(0);
+        bind.is_null = &nullFlag;
+        string output;
+        OutputBinderResultSetter<string> setter;
+        setter.setResult(&output, bind);
+        BOOST_CHECK(result.size() == output.size());
+        BOOST_CHECK(result == output);
     }
 }
 
