@@ -1,12 +1,15 @@
 #include "testOutputBinder.hpp"
+#include "../MySqlException.hpp"
 #include "../OutputBinder.hpp"
 
 #include <cstdint>
 #include <boost/test/unit_test.hpp>
+#include <memory>
 #include <mysql/mysql.h>
 #include <string>
 #include <vector>
 
+using std::shared_ptr;
 using std::string;
 using std::vector;
 
@@ -18,8 +21,8 @@ void testSetResult()
 
     // Put each test in {} to create a local scope so that I don't have to do
     // any weird name mangling
-#ifndef TYPE_TEST
-#define TYPE_TEST(type) \
+#ifndef TYPE_TEST_SET_RESULT
+#define TYPE_TEST_SET_RESULT(type) \
     { \
     type result = rand(); \
     bind.buffer = &result; \
@@ -31,19 +34,20 @@ void testSetResult()
     }
 #endif
 
-    TYPE_TEST(int)
-    TYPE_TEST(float)
-    TYPE_TEST(double)
-    TYPE_TEST(char)
-    TYPE_TEST(int8_t)
-    TYPE_TEST(uint8_t)
-    TYPE_TEST(int16_t)
-    TYPE_TEST(uint16_t)
-    TYPE_TEST(int32_t)
-    TYPE_TEST(uint32_t)
-    TYPE_TEST(int64_t)
-    TYPE_TEST(uint64_t)
+    TYPE_TEST_SET_RESULT(int)
+    TYPE_TEST_SET_RESULT(float)
+    TYPE_TEST_SET_RESULT(double)
+    TYPE_TEST_SET_RESULT(char)
+    TYPE_TEST_SET_RESULT(int8_t)
+    TYPE_TEST_SET_RESULT(uint8_t)
+    TYPE_TEST_SET_RESULT(int16_t)
+    TYPE_TEST_SET_RESULT(uint16_t)
+    TYPE_TEST_SET_RESULT(int32_t)
+    TYPE_TEST_SET_RESULT(uint32_t)
+    TYPE_TEST_SET_RESULT(int64_t)
+    TYPE_TEST_SET_RESULT(uint64_t)
 
+    // std::string test
     {
         string result(" ", 5);
         vector<char> buffer(result.size());
@@ -61,9 +65,112 @@ void testSetResult()
         BOOST_CHECK(result.size() == output.size());
         BOOST_CHECK(result == output);
     }
+    return;
+
+    // std::shared_ptr with NULL test
+    {
+        float output;
+        shared_ptr<decltype(output)> ptr;
+        nullFlag = true;
+        bind.buffer = &output;
+        bind.is_null = &nullFlag;
+        OutputBinderResultSetter<decltype(output)> setter;
+        setter.setResult(&output, bind);
+        BOOST_CHECK(0 == ptr.get());
+    }
+
+    // std::shared_ptr with a value test
+    {
+        float output = rand();
+        shared_ptr<decltype(output)> ptr;
+        nullFlag = false;
+        bind.buffer = &output;
+        bind.is_null = &nullFlag;
+        OutputBinderResultSetter<decltype(output)> setter;
+        setter.setResult(&output, bind);
+        BOOST_CHECK(0 != ptr.get());
+        if (0 != ptr.get())
+        {
+            BOOST_CHECK(output == *ptr);
+        }
+    }
+
+    // Trying to set a NULL value with a non-std::shared_ptr parameter should
+    // throw
+    {
+        float output = rand();
+        nullFlag = true;
+        bind.buffer = &output ;
+        bind.is_null = &nullFlag;
+        OutputBinderResultSetter<decltype(output)> setter;
+        BOOST_CHECK_THROW(setter.setResult(&output, bind), MySqlException);
+    }
 }
 
 
 void testSetParameter()
 {
+    MYSQL_BIND bind;
+    my_bool nullFlag;
+
+    // Put each test in {} to create a local scope so that I don't have to do
+    // any weird name mangling
+#ifndef TYPE_TEST_SET_PARAMETER
+#define TYPE_TEST_SET_PARAMETER(type, mysqlType, isUnsigned) \
+    { \
+    vector<char> buffer; \
+    OutputBinderParameterSetter<type> setter; \
+    setter.setParameter(&bind, &buffer, &nullFlag); \
+    BOOST_CHECK(sizeof(type) == buffer.size()); \
+    BOOST_CHECK(bind.buffer == &buffer.at(0)); \
+    BOOST_CHECK((bool)bind.is_unsigned == (bool)isUnsigned); \
+    BOOST_CHECK(bind.is_null == &nullFlag); \
+    }
+#endif
+
+    TYPE_TEST_SET_PARAMETER(float,    MYSQL_TYPE_FLOAT,    0)
+    TYPE_TEST_SET_PARAMETER(double,   MYSQL_TYPE_DOUBLE,   0)
+    TYPE_TEST_SET_PARAMETER(int8_t,   MYSQL_TYPE_TINY,     0)
+    TYPE_TEST_SET_PARAMETER(uint8_t,  MYSQL_TYPE_TINY,     1)
+    TYPE_TEST_SET_PARAMETER(int16_t,  MYSQL_TYPE_SHORT,    0)
+    TYPE_TEST_SET_PARAMETER(uint16_t, MYSQL_TYPE_SHORT,    1)
+    TYPE_TEST_SET_PARAMETER(int32_t,  MYSQL_TYPE_LONG,     0)
+    TYPE_TEST_SET_PARAMETER(uint32_t, MYSQL_TYPE_LONG,     1)
+    TYPE_TEST_SET_PARAMETER(int64_t,  MYSQL_TYPE_LONGLONG, 0)
+    TYPE_TEST_SET_PARAMETER(uint64_t, MYSQL_TYPE_LONGLONG, 1)
+
+    // User defined types should default to a string that boost::lexical_cast
+    // will convert
+    {
+        class UserType {};
+        vector<char> buffer;
+        OutputBinderParameterSetter<UserType> setter;
+        setter.setParameter(&bind, &buffer, &nullFlag);
+        BOOST_CHECK(bind.buffer == &buffer.at(0));
+        BOOST_CHECK(bind.is_null == &nullFlag);
+    }
+
+    // std::shared_ptr should just forward to the default initialization
+#ifndef SHARED_PTR_TYPE_TEST_SET_PARAMETER
+#define SHARED_PTR_TYPE_TEST_SET_PARAMETER(type, mysqlType, isUnsigned) \
+    { \
+    vector<char> buffer; \
+    OutputBinderParameterSetter<shared_ptr<type>> setter; \
+    setter.setParameter(&bind, &buffer, &nullFlag); \
+    BOOST_CHECK(sizeof(type) == buffer.size()); \
+    BOOST_CHECK(bind.buffer == &buffer.at(0)); \
+    BOOST_CHECK((bool)bind.is_unsigned == (bool)isUnsigned); \
+    BOOST_CHECK(bind.is_null == &nullFlag); \
+    }
+#endif
+    SHARED_PTR_TYPE_TEST_SET_PARAMETER(float,    MYSQL_TYPE_FLOAT,    0)
+    SHARED_PTR_TYPE_TEST_SET_PARAMETER(double,   MYSQL_TYPE_DOUBLE,   0)
+    SHARED_PTR_TYPE_TEST_SET_PARAMETER(int8_t,   MYSQL_TYPE_TINY,     0)
+    SHARED_PTR_TYPE_TEST_SET_PARAMETER(uint8_t,  MYSQL_TYPE_TINY,     1)
+    SHARED_PTR_TYPE_TEST_SET_PARAMETER(int16_t,  MYSQL_TYPE_SHORT,    0)
+    SHARED_PTR_TYPE_TEST_SET_PARAMETER(uint16_t, MYSQL_TYPE_SHORT,    1)
+    SHARED_PTR_TYPE_TEST_SET_PARAMETER(int32_t,  MYSQL_TYPE_LONG,     0)
+    SHARED_PTR_TYPE_TEST_SET_PARAMETER(uint32_t, MYSQL_TYPE_LONG,     1)
+    SHARED_PTR_TYPE_TEST_SET_PARAMETER(int64_t,  MYSQL_TYPE_LONGLONG, 0)
+    SHARED_PTR_TYPE_TEST_SET_PARAMETER(uint64_t, MYSQL_TYPE_LONGLONG, 1)
 }

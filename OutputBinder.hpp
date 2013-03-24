@@ -558,7 +558,7 @@ void OutputBinderParameterSetter<std::shared_ptr<T>>::setParameter(
     my_bool* const isNullFlag
 )
 {
-    // Just forward to the ful specialization
+    // Just forward to the full specialization
     OutputBinderParameterSetter<T> setter;
     setter.setParameter(bind, buffer, isNullFlag);
 }
