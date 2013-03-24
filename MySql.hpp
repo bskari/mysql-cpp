@@ -115,12 +115,11 @@ private:
 };
 
 
-inline static void closeAndThrow(MYSQL_STMT* const statement)
-{
-    MySqlException mse(statement);
-    mysql_stmt_close(statement);
-    throw mse;
-}
+inline static void closeAndThrow(MYSQL_STMT* const statement);
+inline static void closeAndThrow(
+    MYSQL_STMT* const statement,
+    const char* const message
+);
 
 
 template<typename... Args>
@@ -145,15 +144,32 @@ my_ulonglong MySql::runCommand(
     // Commands (e.g. INSERTs or DELETEs) should always have this set to 0
     if (0 != mysql_stmt_field_count(statement))
     {
-        mysql_stmt_close(statement);
-        throw MySqlException("Tried to run query with runCommand");
+        std::string errorMessage;
+        if (0 != mysql_stmt_free_result(statement))
+        {
+            errorMessage = "Unable to free result - ";
+        }
+        if (0 != mysql_stmt_close(statement))
+        {
+            errorMessage += "Unable to close statement - ";
+        }
+        errorMessage += "Tried to run query with runCommand";
+        throw MySqlException(errorMessage);
     }
 
     const size_t parameterCount = mysql_stmt_param_count(statement);
     if (sizeof...(args) != parameterCount)
     {
-        mysql_stmt_close(statement);
-        std::string errorMessage("Incorrect number of parameters; query required ");
+        std::string errorMessage;
+        if (0 != mysql_stmt_free_result(statement))
+        {
+            errorMessage = "Unable to free result - ";
+        }
+        if (0 != mysql_stmt_close(statement))
+        {
+            errorMessage += "Unable to close statement - ";
+        }
+        errorMessage += "Incorrect number of parameters; command required ";
         errorMessage += boost::lexical_cast<std::string>(parameterCount);
         errorMessage += " but ";
         errorMessage += boost::lexical_cast<std::string>(sizeof...(args));
@@ -182,8 +198,21 @@ my_ulonglong MySql::runCommand(
         closeAndThrow(statement);
     }
 
-    mysql_stmt_free_result(statement);
-    mysql_stmt_close(statement);
+    // Cleanup
+    if (0 != mysql_stmt_free_result(statement))
+    {
+        std::string errorMessage;
+        if (0 != mysql_stmt_close(statement))
+        {
+            errorMessage += "Unable to close statement - ";
+        }
+        errorMessage += "Unable to free result";
+        throw MySqlException(errorMessage);
+    }
+    if (0 != mysql_stmt_close(statement))
+    {
+        throw MySqlException("Unable to close statement");
+    }
     return affectedRows;
 }
 
@@ -201,15 +230,24 @@ void MySql::runQuery(
     const size_t length = ::strlen(query);
     if (0 != mysql_stmt_prepare(statement, query, length))
     {
-        throw MySqlException(connection_);
+        closeAndThrow(statement);
     }
 
     // SELECTs should always return something. Commands (e.g. INSERTs or
     // DELETEs) should always have this set to 0.
     if (0 == mysql_stmt_field_count(statement))
     {
-        mysql_stmt_close(statement);
-        throw MySqlException("Tried to run command with runQuery");
+        std::string errorMessage;
+        if (0 != mysql_stmt_free_result(statement))
+        {
+            errorMessage = "Unable to free result - ";
+        }
+        if (0 != mysql_stmt_close(statement))
+        {
+            errorMessage += "Unable to close statement - ";
+        }
+        errorMessage += "Tried to run command with runQuery";
+        throw MySqlException(errorMessage);
     }
 
     // Bind the input parameters
@@ -217,11 +255,17 @@ void MySql::runQuery(
     const size_t parameterCount = mysql_stmt_param_count(statement);
     if (sizeof...(InputArgs) != parameterCount)
     {
-        mysql_stmt_close(statement);
+        std::string errorMessage;
+        if (0 != mysql_stmt_free_result(statement))
+        {
+            errorMessage = "Unable to free result - ";
+        }
+        if (0 != mysql_stmt_close(statement))
+        {
+            errorMessage += "Unable to close statement - ";
+        }
 
-        std::string errorMessage(
-            "Incorrect number of input parameters; query required "
-        );
+        errorMessage += "Incorrect number of input parameters; query required ";
         errorMessage += boost::lexical_cast<std::string>(parameterCount);
         errorMessage += " but ";
         errorMessage += boost::lexical_cast<std::string>(sizeof...(args));
@@ -241,8 +285,20 @@ void MySql::runQuery(
     OutputBinder<OutputArgs...> outputBinder(statement);
     outputBinder.setResults(results);
 
-    mysql_stmt_free_result(statement);
-    mysql_stmt_close(statement);
+    // Cleanup
+    if (0 != mysql_stmt_free_result(statement))
+    {
+        std::string errorMessage("Unable to free result");
+        if (0 != mysql_stmt_close(statement))
+        {
+            errorMessage += " - Unable to close statement";
+        }
+        throw MySqlException(errorMessage);
+    }
+    if (0 != mysql_stmt_close(statement))
+    {
+        throw MySqlException("Unable to close statement");
+    }
 }
 
 
@@ -281,6 +337,41 @@ void MySql::setTuple(
 )
 {
     setTupleElements(t, bindParameters, int_<sizeof...(Args) - 1>());
+}
+
+
+static void closeAndThrow(MYSQL_STMT* const statement)
+{
+    if (0 != mysql_stmt_free_result(statement))
+    {
+        // TODO(bskari|2013-03-23) Handle this error, or at least warn the
+        // user about the memory leak
+    }
+    if (0 != mysql_stmt_close(statement))
+    {
+        // TODO(bskari|2013-03-23) Handle this error, or at least warn the
+        // user about the memory leak
+    }
+    throw MySqlException(statement);
+}
+
+
+static void closeAndThrow(
+    MYSQL_STMT* const statement,
+    const char* const message
+)
+{
+    std::string errorMessage;
+    if (0 != mysql_stmt_free_result(statement))
+    {
+        errorMessage = "Unable to free result - ";
+    }
+    if (0 != mysql_stmt_close(statement))
+    {
+        errorMessage += "Unable to close statement - ";
+    }
+    errorMessage += message;
+    throw MySqlException(errorMessage);
 }
 
 

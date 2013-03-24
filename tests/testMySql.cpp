@@ -273,12 +273,6 @@ void testInvalidCommands()
         }
         counts.clear();
 
-        // General invalid queries
-        BOOST_CHECK_THROW(
-            connection->runCommand("Dance for me, MySQL!"),
-            MySqlException
-        );
-
         // Too few arguments for runCommand
         BOOST_CHECK_THROW(
             connection->runCommand(
@@ -341,12 +335,68 @@ void testInvalidCommands()
         BOOST_CHECK_THROW(
             connection->runQuery(
                 &sharedPtrValues,
-                "SELECT name, passwor FROM user WHERE name = ?",
+                "SELECT name, password FROM user WHERE name = ?",
                 brandon,
                 brandon
             ),
             MySqlException
         );
+
+        // Invalid syntax
+        BOOST_CHECK_THROW(
+            connection->runCommand("Dance for me, MySQL!"),
+            MySqlException
+        );
+        BOOST_CHECK_THROW(
+            connection->runQuery(
+                &counts,
+                "Dance for me, MySQL!"
+            ),
+            MySqlException
+        );
+        BOOST_CHECK(0 == counts.size());
+        counts.clear();
+        BOOST_CHECK_THROW(
+            connection->runQuery(
+                &counts,
+                "Dance for me, MySQL!",
+                brandon
+            ),
+            MySqlException
+        );
+        BOOST_CHECK(0 == counts.size());
+        counts.clear();
+
+        // Invalid semantics
+        BOOST_CHECK_THROW(
+            connection->runCommand("INSERT INTO nonexistent_table VALUES (1)"),
+            MySqlException
+        );
+        BOOST_CHECK_THROW(
+            connection->runCommand(
+                "INSERT INTO nonexistent_table VALUES (1)",
+                brandon
+            ),
+            MySqlException
+        );
+        BOOST_CHECK_THROW(
+            connection->runQuery(
+                &counts,
+                "SELECT 1 FROM nonexistent_table"
+            ),
+            MySqlException
+        );
+        BOOST_CHECK(0 == counts.size());
+        counts.clear();
+        BOOST_CHECK_THROW(
+            connection->runQuery(
+                &counts,
+                "SELECT 1 FROM nonexistent_table",
+                brandon
+            ),
+            MySqlException
+        );
+        BOOST_CHECK(0 == counts.size());
     }
     catch (const exception& e)
     {

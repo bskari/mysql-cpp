@@ -70,7 +70,10 @@ MySql::~MySql()
 
 my_ulonglong MySql::runCommand(const char* const command)
 {
-    mysql_real_query(connection_, command, strlen(command));
+    if (0 != mysql_real_query(connection_, command, strlen(command)))
+    {
+        throw MySqlException(connection_);
+    }
 
     // If the user ran a SELECT statement or something else, at least warn them
     const my_ulonglong affectedRows = mysql_affected_rows(connection_);
