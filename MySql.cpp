@@ -76,7 +76,11 @@ my_ulonglong MySql::runCommand(const char* const command)
     const my_ulonglong affectedRows = mysql_affected_rows(connection_);
     if ((my_ulonglong) - 1 == affectedRows)
     {
-        throw MySqlException(connection_);
+        // Clean up after the query
+        MYSQL_RES* const result = mysql_store_result(connection_);
+        mysql_free_result(result);
+
+        throw MySqlException("Tried to run query with runCommand");
     }
 
     return affectedRows;

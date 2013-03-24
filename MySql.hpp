@@ -115,6 +115,14 @@ private:
 };
 
 
+inline static void closeAndThrow(MYSQL_STMT* const statement)
+{
+    MySqlException mse(statement);
+    mysql_stmt_close(statement);
+    throw mse;
+}
+
+
 template<typename... Args>
 my_ulonglong MySql::runCommand(
     const char* const command,
@@ -131,9 +139,14 @@ my_ulonglong MySql::runCommand(
     const int status = mysql_stmt_prepare(statement, command, length);
     if (0 != status)
     {
-        MySqlException mse(statement);
+        closeAndThrow(statement);
+    }
+
+    // Commands (e.g. INSERTs or DELETEs) should always have this set to 0
+    if (0 != mysql_stmt_field_count(statement))
+    {
         mysql_stmt_close(statement);
-        throw mse;
+        throw MySqlException("Tried to run query with runCommand");
     }
 
     const size_t parameterCount = mysql_stmt_param_count(statement);
@@ -154,27 +167,22 @@ my_ulonglong MySql::runCommand(
     binder.bind(&bindParameters, args...);
     if (0 != mysql_stmt_bind_param(statement, &bindParameters[0]))
     {
-        MySqlException mse(statement);
-        mysql_stmt_close(statement);
-        throw mse;
+        closeAndThrow(statement);
     }
 
     if (0 != mysql_stmt_execute(statement))
     {
-        MySqlException mse(statement);
-        mysql_stmt_close(statement);
-        throw mse;
+        closeAndThrow(statement);
     }
 
     // If the user ran a SELECT statement or something else, at least warn them
     const my_ulonglong affectedRows = mysql_stmt_affected_rows(statement);
     if (((my_ulonglong)(-1)) == affectedRows)
     {
-        MySqlException mse(statement);
-        mysql_stmt_close(statement);
-        throw mse;
+        closeAndThrow(statement);
     }
 
+    mysql_stmt_free_result(statement);
     mysql_stmt_close(statement);
     return affectedRows;
 }
@@ -194,6 +202,14 @@ void MySql::runQuery(
     if (0 != mysql_stmt_prepare(statement, query, length))
     {
         throw MySqlException(connection_);
+    }
+
+    // SELECTs should always return something. Commands (e.g. INSERTs or
+    // DELETEs) should always have this set to 0.
+    if (0 == mysql_stmt_field_count(statement))
+    {
+        mysql_stmt_close(statement);
+        throw MySqlException("Tried to run command with runQuery");
     }
 
     // Bind the input parameters
@@ -219,14 +235,13 @@ void MySql::runQuery(
     inputBinder.bind(&inputBindParameters, args...);
     if (0 != mysql_stmt_bind_param(statement, &inputBindParameters[0]))
     {
-        MySqlException mse(statement);
-        mysql_stmt_close(statement);
-        throw mse;
+        closeAndThrow(statement);
     }
 
     OutputBinder<OutputArgs...> outputBinder(statement);
     outputBinder.setResults(results);
 
+    mysql_stmt_free_result(statement);
     mysql_stmt_close(statement);
 }
 
