@@ -9,9 +9,10 @@ examples: examples.o libmysqlcpp.so
 	$(CXX) $(CXXFLAGS) examples.o libmysqlcpp.so -lmysqlclient_r -o examples
 
 test: tests/test.o tests/testInputBinder.o tests/testInputBinder.hpp \
-	tests/testOutputBinder.o tests/testOutputBinder.hpp MySqlException.o
+	tests/testOutputBinder.o tests/testOutputBinder.hpp \
+	tests/testMySql.hpp tests/testMySql.o MySqlException.o MySql.o
 	$(CXX) $(CXXFLAGS) tests/test.o tests/testInputBinder.o \
-		tests/testOutputBinder.o MySqlException.o \
+		tests/testOutputBinder.o tests/testMySql.o MySqlException.o MySql.o \
 		-lboost_unit_test_framework -lmysqlclient_r -o test
 
 examples.o: examples.cpp MySql.hpp MySqlException.hpp InputBinder.hpp \

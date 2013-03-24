@@ -1,4 +1,5 @@
 #include "testInputBinder.hpp"
+#include "testMySql.hpp"
 #include "testOutputBinder.hpp"
 
 #include <boost/test/included/unit_test.hpp>
@@ -38,7 +39,12 @@ test::test_suite* init_unit_test_suite(int, char*[])
         FD(testBind),
         // Tests from testOutputBinder.hpp
         FD(testSetResult),
-        FD(testSetParameter)
+        FD(testSetParameter),
+        // Tests from testMySql.hpp
+        FD(testConnection),
+        FD(testRunCommand),
+        FD(testRunQuery),
+        FD(testInvalidCommands)
     };
 
     for (size_t i = 0; i < sizeof(functions) / sizeof(functions[0]); ++i)
