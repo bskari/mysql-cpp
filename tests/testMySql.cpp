@@ -348,6 +348,10 @@ void testInvalidCommands()
             MySqlException
         );
         BOOST_CHECK_THROW(
+            connection->runCommand("Dance for me, MySQL!", brandon),
+            MySqlException
+        );
+        BOOST_CHECK_THROW(
             connection->runQuery(
                 &counts,
                 "Dance for me, MySQL!"

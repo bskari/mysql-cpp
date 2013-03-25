@@ -12,6 +12,10 @@
 *.la
 *.a
 
+# Coverage testing files
+*.gcno
+*.gcda
+
 # Compiled binaries
 examples
 test
