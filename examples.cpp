@@ -1,4 +1,5 @@
 #include <cassert>
+
 #include <iostream>
 #include <memory>
 #include <string>
@@ -20,7 +21,7 @@ using std::tuple;
 using std::vector;
 
 
-template <std::size_t> struct int_{}; // compile-time counter
+template <std::size_t> struct int_ {};  // compile-time counter
 
 template <typename Char, typename Traits, typename Tuple, std::size_t I>
 void printTuple(std::basic_ostream<Char, Traits>& out, Tuple const& t, int_<I>);
@@ -35,16 +36,12 @@ template <typename T>
 void printSharedPtr(ostream& out, const shared_ptr<T>& ptr);
 
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     string password;
-    if (argc == 1)
-    {
+    if (argc == 1) {
         cout << "Enter MySQL root password: " << endl;
         cin >> password;
-    }
-    else
-    {
+    } else {
         password = argv[1];
     }
     MySql conn("127.0.0.1", "root", password.c_str(), nullptr);
@@ -60,8 +57,7 @@ int main(int argc, char* argv[])
             "PRIMARY KEY(id),"
             "email VARCHAR(64) NOT NULL,"
             "password CHAR(64) NOT NULL,"
-            "age INT)"
-    );
+            "age INT)");
 
     // ************
     // Easy inserts
@@ -70,20 +66,17 @@ int main(int argc, char* argv[])
     string emails[] = {
         "bskari@yelp.com",
         "brandon.skari@gmail.com",
-        "brandon@skari.org"
-    };
+        "brandon@skari.org"};
     string passwords[] = {
         "peace",
         "love",
-        "griffin"
-    };
+        "griffin"};
     conn.runCommand(
         "INSERT INTO user (email, password, age)"
             " VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)",
         emails[0], passwords[0], ages[0],
         emails[1], passwords[1], ages[1],
-        emails[2], passwords[2], ages[2]
-    );
+        emails[2], passwords[2], ages[2]);
 
     typedef tuple<int, string, string, int> userTuple;
     vector<userTuple> users;
@@ -108,8 +101,7 @@ int main(int argc, char* argv[])
         vector<userTuple>::const_iterator user(users.begin());
         user != end;
         ++user
-    )
-    {
+    ) {
         cout << *user << endl;
     }
     users.clear();
@@ -120,16 +112,12 @@ int main(int argc, char* argv[])
     conn.runCommand(
         "INSERT INTO user (email, password, age) VALUES (?, ?, NULL)",
         emails[0],
-        passwords[0]
-    );
+        passwords[0]);
 
-    try
-    {
+    try {
         // Trying to insert NULLs into a normal tuple will throw
         conn.runQuery(&users, "SELECT * FROM user");
-    }
-    catch (const MySqlException& e)
-    {
+    } catch (const MySqlException& e) {
         cout << e.what() << endl;
     }
 
@@ -147,8 +135,7 @@ int main(int argc, char* argv[])
         vector<autoPtrUserTuple>::iterator user(autoPtrUsers.begin());
         user != autoPtrEnd;
         ++user
-    )
-    {
+    ) {
         cout << "(";
         printSharedPtr(cout, get<0>(*user));
         cout << ", ";
@@ -172,14 +159,11 @@ int main(int argc, char* argv[])
     // **************************************
     // Look at all these type-based failures!
     // **************************************
-    try
-    {
+    try {
         // Wrong number of fields
         vector<tuple<int>> ages;
         conn.runQuery(&ages, "SELECT * FROM user");
-    }
-    catch (const MySqlException& e)
-    {
+    } catch (const MySqlException& e) {
         cout << e.what() << endl;
     }
 
@@ -188,15 +172,13 @@ int main(int argc, char* argv[])
 
 
 template<typename Char, typename Traits, typename Tuple, size_t I>
-void printTuple(basic_ostream<Char, Traits>& out, Tuple const& t, int_<I>)
-{
+void printTuple(basic_ostream<Char, Traits>& out, Tuple const& t, int_<I>) {
     printTuple(out, t, int_<I - 1>());
     out << ", " << get<I>(t);
 }
 
 template<typename Char, typename Traits, typename Tuple>
-void printTuple(basic_ostream<Char, Traits>& out, Tuple const& t, int_<0>)
-{
+void printTuple(basic_ostream<Char, Traits>& out, Tuple const& t, int_<0>) {
       out << get<0>(t);
 }
 
@@ -204,8 +186,7 @@ template<typename Char, typename Traits, typename... Args>
 ostream& operator<<(
     basic_ostream<Char, Traits>& out,
     tuple<Args...> const& t
-)
-{
+) {
     out << "(";
     printTuple(out, t, int_<sizeof...(Args) - 1>());
     out << ")";
@@ -213,14 +194,10 @@ ostream& operator<<(
 }
 
 template <typename T>
-void printSharedPtr(ostream& out, const shared_ptr<T>& ptr)
-{
-    if (nullptr != ptr.get())
-    {
+void printSharedPtr(ostream& out, const shared_ptr<T>& ptr) {
+    if (nullptr != ptr.get()) {
         out << *ptr;
-    }
-    else
-    {
+    } else {
         out << "NULL";
     }
 }

@@ -38,8 +38,7 @@ MySql::MySql(
 )
     : connection_(mysql_init(nullptr))
 {
-    if (nullptr == connection_)
-    {
+    if (nullptr == connection_) {
         throw MySqlException("Unable to connect to MySQL");
     }
 
@@ -51,10 +50,8 @@ MySql::MySql(
         database,
         port,
         nullptr,
-        0
-    );
-    if (nullptr == success)
-    {
+        0);
+    if (nullptr == success) {
         MySqlException mse(connection_);
         mysql_close(connection_);
         throw mse;
@@ -62,23 +59,19 @@ MySql::MySql(
 }
 
 
-MySql::~MySql()
-{
+MySql::~MySql() {
     mysql_close(connection_);
 }
 
 
-my_ulonglong MySql::runCommand(const char* const command)
-{
-    if (0 != mysql_real_query(connection_, command, strlen(command)))
-    {
+my_ulonglong MySql::runCommand(const char* const command) {
+    if (0 != mysql_real_query(connection_, command, strlen(command))) {
         throw MySqlException(connection_);
     }
 
     // If the user ran a SELECT statement or something else, at least warn them
     const my_ulonglong affectedRows = mysql_affected_rows(connection_);
-    if ((my_ulonglong) - 1 == affectedRows)
-    {
+    if ((my_ulonglong) - 1 == affectedRows) {
         // Clean up after the query
         MYSQL_RES* const result = mysql_store_result(connection_);
         mysql_free_result(result);

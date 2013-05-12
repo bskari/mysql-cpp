@@ -1,4 +1,4 @@
-CXXFLAGS=-std=c++0x -Wall -Wextra -Weffc++ -g --coverage
+CXXFLAGS=-std=c++0x --pedantic -Wall -Wextra -Weffc++ -g --coverage
 CXX=g++
 STATICFLAGS=$(CXXFLAGS) -c -fPIC
 SHAREDFLAGS=$(CXXFLAGS) -shared
