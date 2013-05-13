@@ -1,4 +1,5 @@
 #include "MySql.hpp"
+#include "MySqlException.hpp"
 
 #include <cassert>
 #include <cstdint>
@@ -7,8 +8,6 @@
 #include <string>
 #include <sstream>
 #include <vector>
-
-#include "MySqlException.hpp"
 
 
 using std::string;

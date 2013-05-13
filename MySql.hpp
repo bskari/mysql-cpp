@@ -79,24 +79,6 @@ class MySql {
         my_ulonglong runCommand(const char* const command);
 
     private:
-        template<std::size_t I> struct int_ {};  // Compile-time counter
-
-        template<typename Tuple, size_t I>
-        static void setTupleElements(
-            Tuple* const returnValue,
-            const std::vector<MYSQL_BIND>& bindParameters,
-            int_<I>);
-        template<typename Tuple>
-        static void setTupleElements(
-            Tuple* const returnValue,
-            const std::vector<MYSQL_BIND>& bindParameters,
-            int_<-1>);
-
-        template<typename... Args>
-        static void setTuple(
-            std::tuple<Args...>* const t,
-            const std::vector<MYSQL_BIND>& bindParameters);
-
         MYSQL* connection_;
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 4)
@@ -263,40 +245,6 @@ void MySql::runQuery(
     if (0 != mysql_stmt_close(statement)) {
         throw MySqlException("Unable to close statement");
     }
-}
-
-
-template<typename Tuple, size_t I>
-void MySql::setTupleElements(
-    Tuple* const tuple,
-    const std::vector<MYSQL_BIND>& bindParameters,
-    int_<I>
-) {
-    assert(nullptr != tuple);
-
-    std::get<I>(*tuple) = *static_cast<const decltype(std::get<I>(*tuple))*>(
-        bindParameters.at(I).buffer);
-
-    // Recursively set the rest of the elements
-    setTupleElements(tuple, bindParameters, int_<I - 1>());
-}
-
-
-template<typename Tuple>
-void MySql::setTupleElements(
-    Tuple* const,
-    const std::vector<MYSQL_BIND>&,
-    int_<-1>
-) {
-}
-
-
-template<typename... Args>
-void MySql::setTuple(
-    std::tuple<Args...>* const t,
-    const std::vector<MYSQL_BIND>& bindParameters
-) {
-    setTupleElements(t, bindParameters, int_<sizeof...(Args) - 1>());
 }
 
 
