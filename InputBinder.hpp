@@ -98,206 +98,63 @@ struct InputBinder<N, std::string, Tail...> {
 };
 
 
-// *******************************************
-// Partial template specialization for int32_t
-// *******************************************
-template <size_t N, typename... Tail>
-struct InputBinder<N, int32_t, Tail...> {
-    static void bind(
-        std::vector<MYSQL_BIND>* const bindParameters,
-        const int32_t& value,
-        const Tail&... tail
-    ) {
-        // Set up the bind parameters
-        MYSQL_BIND& bindParameter = bindParameters->at(N);
-
-        bindParameter.buffer_type = MYSQL_TYPE_LONG;
-        bindParameter.buffer = const_cast<void*>(
-            static_cast<const void*>(&value));
-        bindParameter.is_unsigned = 0;
-        bindParameter.is_null = 0;
-
-        InputBinder<N + 1, Tail...> b;
-        b.bind(bindParameters, tail...);
-    }
+#ifndef INPUT_BINDER_INTEGRAL_TYPE_SPECIALIZATION
+#define INPUT_BINDER_INTEGRAL_TYPE_SPECIALIZATION(type, mysqlType, isUnsigned) \
+template <size_t N, typename... Tail> \
+struct InputBinder<N, type, Tail...> { \
+    static void bind( \
+        std::vector<MYSQL_BIND>* const bindParameters, \
+        const type& value, \
+        const Tail&... tail \
+    ) { \
+        /* Set up the bind parameters */ \
+        MYSQL_BIND& bindParameter = bindParameters->at(N); \
+        bindParameter.buffer_type = mysqlType; \
+        bindParameter.buffer = const_cast<void*>( \
+            static_cast<const void*>(&value)); \
+        bindParameter.is_unsigned = isUnsigned; \
+        bindParameter.is_null = 0; \
+        InputBinder<N + 1, Tail...> binder; \
+        binder.bind(bindParameters, tail...); \
+    } \
 };
+#endif
+
+INPUT_BINDER_INTEGRAL_TYPE_SPECIALIZATION(int8_t,   MYSQL_TYPE_TINY,     0)
+INPUT_BINDER_INTEGRAL_TYPE_SPECIALIZATION(uint8_t,  MYSQL_TYPE_TINY,     1)
+INPUT_BINDER_INTEGRAL_TYPE_SPECIALIZATION(int16_t,  MYSQL_TYPE_SHORT,    0)
+INPUT_BINDER_INTEGRAL_TYPE_SPECIALIZATION(uint16_t, MYSQL_TYPE_SHORT,    1)
+INPUT_BINDER_INTEGRAL_TYPE_SPECIALIZATION(int32_t,  MYSQL_TYPE_LONG,     0)
+INPUT_BINDER_INTEGRAL_TYPE_SPECIALIZATION(uint32_t, MYSQL_TYPE_LONG,     1)
+INPUT_BINDER_INTEGRAL_TYPE_SPECIALIZATION(int64_t,  MYSQL_TYPE_LONGLONG, 0)
+INPUT_BINDER_INTEGRAL_TYPE_SPECIALIZATION(uint64_t, MYSQL_TYPE_LONGLONG, 1)
 
 
-// ********************************************
-// Partial template specialization for uint32_t
-// ********************************************
-template <size_t N, typename... Tail>
-struct InputBinder<N, uint32_t, Tail...> {
-    static void bind(
-        std::vector<MYSQL_BIND>* const bindParameters,
-        const uint32_t& value,
-        const Tail&... tail
-    ) {
-        // Set up the bind parameters
-        MYSQL_BIND& bindParameter = bindParameters->at(N);
-
-        bindParameter.buffer_type = MYSQL_TYPE_LONG;
-        bindParameter.buffer = const_cast<void*>(
-            static_cast<const void*>(&value));
-        bindParameter.is_unsigned = 1;
-        bindParameter.is_null = 0;
-
-        InputBinder<N + 1, Tail...> b;
-        b.bind(bindParameters, tail...);
-    }
+#ifndef INPUT_BINDER_FLOATING_TYPE_SPECIALIZATION
+#define INPUT_BINDER_FLOATING_TYPE_SPECIALIZATION(type, mysqlType, size) \
+template <size_t N, typename... Tail> \
+struct InputBinder<N, type, Tail...> { \
+    static void bind( \
+        std::vector<MYSQL_BIND>* const bindParameters, \
+        const type& value, \
+        const Tail&... tail \
+    ) { \
+        /* MySQL expects specific sizes for floating point types */ \
+        static_assert(size == sizeof(type), "Unexpected floating point size"); \
+        /* Set up the bind parameters */ \
+        MYSQL_BIND& bindParameter = bindParameters->at(N); \
+        bindParameter.buffer_type = mysqlType; \
+        bindParameter.buffer = const_cast<void*>( \
+            static_cast<const void*>(&value)); \
+        bindParameter.is_null = 0; \
+        InputBinder<N + 1, Tail...> b; \
+        b.bind(bindParameters, tail...); \
+    } \
 };
+#endif
 
-
-// *******************************************
-// Partial template specialization for int16_t
-// *******************************************
-template <size_t N, typename... Tail>
-struct InputBinder<N, int16_t, Tail...> {
-    static void bind(
-        std::vector<MYSQL_BIND>* const bindParameters,
-        const int16_t& value,
-        const Tail&... tail
-    ) {
-        // Set up the bind parameters
-        MYSQL_BIND& bindParameter = bindParameters->at(N);
-
-        bindParameter.buffer_type = MYSQL_TYPE_SHORT;
-        bindParameter.buffer = const_cast<void*>(
-            static_cast<const void*>(&value));
-        bindParameter.is_unsigned = 0;
-        bindParameter.is_null = 0;
-
-        InputBinder<N + 1, Tail...> b;
-        b.bind(bindParameters, tail...);
-    }
-};
-
-
-// ********************************************
-// Partial template specialization for uint16_t
-// ********************************************
-template <size_t N, typename... Tail>
-struct InputBinder<N, uint16_t, Tail...> {
-    static void bind(
-        std::vector<MYSQL_BIND>* const bindParameters,
-        const uint16_t& value,
-        const Tail&... tail
-    ) {
-        // Set up the bind parameters
-        MYSQL_BIND& bindParameter = bindParameters->at(N);
-
-        bindParameter.buffer_type = MYSQL_TYPE_SHORT;
-        bindParameter.buffer = const_cast<void*>(
-            static_cast<const void*>(&value));
-        bindParameter.is_unsigned = 1;
-        bindParameter.is_null = 0;
-
-        InputBinder<N + 1, Tail...> b;
-        b.bind(bindParameters, tail...);
-    }
-};
-
-
-// ******************************************
-// Partial template specialization for int8_t
-// ******************************************
-template <size_t N, typename... Tail>
-struct InputBinder<N, int8_t, Tail...> {
-    static void bind(
-        std::vector<MYSQL_BIND>* const bindParameters,
-        const int8_t& value,
-        const Tail&... tail
-    ) {
-        // Set up the bind parameters
-        MYSQL_BIND& bindParameter = bindParameters->at(N);
-
-        bindParameter.buffer_type = MYSQL_TYPE_TINY;
-        bindParameter.buffer = const_cast<void*>(
-            static_cast<const void*>(&value));
-        bindParameter.is_unsigned = 0;
-        bindParameter.is_null = 0;
-
-        InputBinder<N + 1, Tail...> b;
-        b.bind(bindParameters, tail...);
-    }
-};
-
-
-// *******************************************
-// Partial template specialization for uint8_t
-// *******************************************
-template <size_t N, typename... Tail>
-struct InputBinder<N, uint8_t, Tail...> {
-    static void bind(
-        std::vector<MYSQL_BIND>* const bindParameters,
-        const uint8_t& value,
-        const Tail&... tail
-    ) {
-        // Set up the bind parameters
-        MYSQL_BIND& bindParameter = bindParameters->at(N);
-
-        bindParameter.buffer_type = MYSQL_TYPE_TINY;
-        bindParameter.buffer = const_cast<void*>(
-            static_cast<const void*>(&value));
-        bindParameter.is_unsigned = 1;
-        bindParameter.is_null = 0;
-
-        InputBinder<N + 1, Tail...> b;
-        b.bind(bindParameters, tail...);
-    }
-};
-
-
-// *****************************************
-// Partial template specialization for float
-// *****************************************
-template <size_t N, typename... Tail>
-struct InputBinder<N, float, Tail...> {
-    static void bind(
-        std::vector<MYSQL_BIND>* const bindParameters,
-        const float& value,
-        const Tail&... tail
-    ) {
-        static_assert(4 == sizeof(float), "Unexpected float size");
-
-        // Set up the bind parameters
-        MYSQL_BIND& bindParameter = bindParameters->at(N);
-
-        bindParameter.buffer_type = MYSQL_TYPE_FLOAT;
-        bindParameter.buffer = const_cast<void*>(
-            static_cast<const void*>(&value));
-        bindParameter.is_null = 0;
-
-        InputBinder<N + 1, Tail...> b;
-        b.bind(bindParameters, tail...);
-    }
-};
-
-
-// ******************************************
-// Partial template specialization for double
-// ******************************************
-template <size_t N, typename... Tail>
-struct InputBinder<N, double, Tail...> {
-    static void bind(
-        std::vector<MYSQL_BIND>* const bindParameters,
-        const double& value,
-        const Tail&... tail
-    ) {
-        static_assert(8 == sizeof(double), "Unexpected double size");
-
-        // Set up the bind parameters
-        MYSQL_BIND& bindParameter = bindParameters->at(N);
-
-        bindParameter.buffer_type = MYSQL_TYPE_DOUBLE;
-        bindParameter.buffer = const_cast<void*>(
-            static_cast<const void*>(&value));
-        bindParameter.is_null = 0;
-
-        InputBinder<N + 1, Tail...> b;
-        b.bind(bindParameters, tail...);
-    }
-};
+INPUT_BINDER_FLOATING_TYPE_SPECIALIZATION(float, MYSQL_TYPE_FLOAT, 4)
+INPUT_BINDER_FLOATING_TYPE_SPECIALIZATION(double, MYSQL_TYPE_DOUBLE, 8)
 
 
 #endif  // INPUTBINDER_HPP_
