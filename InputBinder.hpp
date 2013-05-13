@@ -19,12 +19,18 @@ struct InputBinder {
 
 template <size_t N, typename Head, typename... Tail>
 struct InputBinder<N, Head, Tail...> {
-    // This is purposely left undefined; individual types should have partial
-    // template specialized instances defined for them instead.
     static void bind(
-        std::vector<MYSQL_BIND>* const bindParameters,
-        const Head& value,
-        const Tail&... tail);
+        std::vector<MYSQL_BIND>* const,
+        const Head&,
+        const Tail&...
+    ) {
+        // C++ guarantees that the sizeof any parameter pack >= 0, so this will
+        // always give a compile time error.
+        static_assert(
+            sizeof...(Tail) < 0,
+            "All types need to have partial template specialized instances"
+            " defined for them");
+    }
 };
 
 

@@ -421,7 +421,7 @@ void OutputBinderResultSetter<T*>::setResult(T** const, const MYSQL_BIND&) {
         // C++ guarantees that the sizeof any type >= 0, so this will always
         // give a compile time error
         sizeof(T) < 0,
-        "Raw pointers are not suppoorted; use std::shared_ptr instead");
+        "Raw pointers are not supported; use std::shared_ptr instead");
 }
 // ***********************************
 // Full specializations for setResult
