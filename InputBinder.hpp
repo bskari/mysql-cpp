@@ -29,7 +29,7 @@ struct InputBinder<N, Head, Tail...> {
         static_assert(
             sizeof...(Tail) < 0,
             "All types need to have partial template specialized instances"
-            " defined for them");
+            " defined for them, but one is missing for type Head.");
     }
 };
 
@@ -38,7 +38,7 @@ struct InputBinder<N, Head, Tail...> {
 // Partial template specialization for char pointer
 // ************************************************
 template <size_t N, typename... Tail>
-struct InputBinder<N, const char*, Tail...> {
+struct InputBinder<N, char*, Tail...> {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const char* const& value,
@@ -60,13 +60,14 @@ struct InputBinder<N, const char*, Tail...> {
     }
 };
 template <size_t N, typename... Tail>
-struct InputBinder<N, char*&, Tail...> {
+struct InputBinder<N, const char*, Tail...> {
     static void bind(
         std::vector<MYSQL_BIND>* const bindParameters,
         const char* const& value,
         const Tail&... tail
     ) {
-        bind(bindParameters, value, tail...);
+        InputBinder<N, char*, Tail...> binder;
+        binder.bind(bindParameters, const_cast<char*>(value), tail...);
     }
 };
 

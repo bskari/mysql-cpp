@@ -1,29 +1,32 @@
+#include <cstring>
+#include <mysql/mysql.h>
+
+#include <boost/test/unit_test.hpp>
+#include <vector>
+#include <string>
+
 #include "testInputBinder.hpp"
 #include "../InputBinder.hpp"
 
-#include <boost/test/unit_test.hpp>
-#include <mysql/mysql.h>
-#include <vector>
-
+using std::string;
 using std::vector;
 
 
 void testBind()
 {
-    vector<MYSQL_BIND> binds;
 
 #ifndef INTEGRAL_TYPE_SPECIALIZATION_CHECK
 #define INTEGRAL_TYPE_SPECIALIZATION_CHECK(type, mysqlType, isUnsigned) \
     { \
+        vector<MYSQL_BIND> binds; \
+        binds.resize(1); \
         InputBinder<0, type> binder; \
         type t = 0; \
-        binds.resize(1); \
         binder.bind(&binds, t); \
         BOOST_CHECK(mysqlType == binds.at(0).buffer_type); \
         BOOST_CHECK(0 == binds.at(0).is_null); \
         BOOST_CHECK(isUnsigned == binds.at(0).is_unsigned); \
         BOOST_CHECK(nullptr != binds.at(0).buffer); \
-        binds.clear(); \
     }
 #endif
 
@@ -38,21 +41,66 @@ void testBind()
     INTEGRAL_TYPE_SPECIALIZATION_CHECK(int64_t,  MYSQL_TYPE_LONGLONG,  0);
     INTEGRAL_TYPE_SPECIALIZATION_CHECK(uint64_t, MYSQL_TYPE_LONGLONG,  1);
 
-    InputBinder<0, float> floatBinder;
-    float Float = 0.0;
-    binds.resize(1);
-    floatBinder.bind(&binds, Float);
-    BOOST_CHECK(MYSQL_TYPE_FLOAT == binds.at(0).buffer_type);
-    BOOST_CHECK(0 == binds.at(0).is_null);
-    BOOST_CHECK(nullptr != binds.at(0).buffer);
-    binds.clear();
+    {
+        vector<MYSQL_BIND> binds;
+        binds.resize(1);
+        InputBinder<0, float> binder;
+        float t = 0.0;
+        binder.bind(&binds, t);
+        BOOST_CHECK(MYSQL_TYPE_FLOAT == binds.at(0).buffer_type);
+        BOOST_CHECK(0 == binds.at(0).is_null);
+        // MySQL ignores require the is_unsigned field for floting point types,
+        // so don't check that attribute
+        BOOST_CHECK(nullptr != binds.at(0).buffer);
+    }
 
-    InputBinder<0, double> doubleBinder;
-    double Double = 0;
-    binds.resize(1);
-    doubleBinder.bind(&binds, Double);
-    BOOST_CHECK(MYSQL_TYPE_DOUBLE == binds.at(0).buffer_type);
-    BOOST_CHECK(0 == binds.at(0).is_null);
-    BOOST_CHECK(nullptr != binds.at(0).buffer);
-    binds.clear();
+    {
+        vector<MYSQL_BIND> binds;
+        binds.resize(1);
+        InputBinder<0, double> binder;
+        double t = 0;
+        binder.bind(&binds, t);
+        BOOST_CHECK(MYSQL_TYPE_DOUBLE == binds.at(0).buffer_type);
+        BOOST_CHECK(0 == binds.at(0).is_null);
+        // MySQL ignores require the is_unsigned field for floting point types,
+        // so don't check that attribute
+        BOOST_CHECK(nullptr != binds.at(0).buffer);
+    }
+
+    {
+        vector<MYSQL_BIND> binds;
+        binds.resize(1);
+        InputBinder<0, char*> binder;
+        char t[50];
+        strcpy(t, "Hello world");
+        binder.bind(&binds, t);
+        BOOST_CHECK(MYSQL_TYPE_STRING == binds.at(0).buffer_type);
+        BOOST_CHECK(strlen(t) == binds.at(0).buffer_length);
+        BOOST_CHECK(0 == binds.at(0).is_null);
+        BOOST_CHECK(nullptr != binds.at(0).buffer);
+    }
+
+    {
+        vector<MYSQL_BIND> binds;
+        binds.resize(1);
+        InputBinder<0, const char*> binder;
+        const char t[50] = "Hello world";
+        binder.bind(&binds, t);
+        BOOST_CHECK(MYSQL_TYPE_STRING == binds.at(0).buffer_type);
+        BOOST_CHECK(strlen(t) == binds.at(0).buffer_length);
+        BOOST_CHECK(0 == binds.at(0).is_null);
+        BOOST_CHECK(nullptr != binds.at(0).buffer);
+    }
+
+    {
+        vector<MYSQL_BIND> binds;
+        binds.resize(1);
+        InputBinder<0, string> binder;
+        string t("Hello world");
+        binder.bind(&binds, t);
+        BOOST_CHECK(MYSQL_TYPE_STRING == binds.at(0).buffer_type);
+        BOOST_CHECK(t.size() == binds.at(0).buffer_length);
+        BOOST_CHECK(0 == binds.at(0).is_null);
+        BOOST_CHECK(nullptr != binds.at(0).buffer);
+    }
 }
