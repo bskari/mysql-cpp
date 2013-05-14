@@ -1,14 +1,15 @@
-#include "testMySql.hpp"
-#include "../MySql.hpp"
+#include <mysql/mysql.h>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/test/unit_test.hpp>
 #include <exception>
 #include <memory>
-#include <mysql/mysql.h>
 #include <string>
-#include <tuple>
+#include <tuple>  // NOLINT[build/include_order]
 #include <vector>
+
+#include "testMySql.hpp"
+#include "../MySql.hpp"
 
 using boost::bad_lexical_cast;
 using std::exception;
@@ -29,38 +30,28 @@ const char* const database = "test_mysql_cpp";
 static void createUserTable(const unique_ptr<MySql>& connection);
 static void testSimpleSelects(
     const unique_ptr<MySql>& connection,
-    const char* const host
-);
+    const char* const host);
 
 
-void testConnection()
-{
+void testConnection() {
     // Try the connection through a Unix domain socket
-    try
-    {
+    try {
         const char* const host = "localhost";
         unique_ptr<MySql> connection(
-            new MySql(host, username, password, database)
-        );
+            new MySql(host, username, password, database));
         testSimpleSelects(connection, host);
-    }
-    catch (const exception& e)
-    {
+    } catch (const exception& e) {
         BOOST_ERROR(e.what());
     }
 
     // Try the connection through a TCP socket
-    try
-    {
+    try {
         const char* const host = "127.0.0.1";
         unique_ptr<MySql> connection(
-            new MySql(host, username, password, database)
-        );
+            new MySql(host, username, password, database));
         // MySQL still reports the user as connection from "localhost"
         testSimpleSelects(connection, "localhost");
-    }
-    catch (const exception& e)
-    {
+    } catch (const exception& e) {
         BOOST_ERROR(e.what());
     }
 
@@ -69,14 +60,11 @@ void testConnection()
 }
 
 
-void testRunCommand()
-{
-    try
-    {
+void testRunCommand() {
+    try {
         const char* const host = "localhost";
         unique_ptr<MySql> connection(
-            new MySql(host, username, password, database)
-        );
+            new MySql(host, username, password, database));
 
         // Test affected row counts
         createUserTable(connection);
@@ -84,70 +72,57 @@ void testRunCommand()
         my_ulonglong affectedRows = connection->runCommand(
             "INSERT INTO user (name, password) VALUES "
             "('brandon', 'peace'), "
-            "('gary', NULL)"
-        );
+            "('gary', NULL)");
         BOOST_CHECK(2 == affectedRows);
-        
+
         BOOST_CHECK_THROW(
             connection->runCommand(
-                "INSERT INTO user (name, password) VALUES ('brandon', 'password')"
-            ),
-            MySqlException
-        );
+                "INSERT INTO user (name, password)"
+                " VALUES ('brandon', 'password')"),
+            MySqlException);
 
         affectedRows = connection->runCommand(
-            "UPDATE user SET password = 'love' WHERE name = 'gary'"
-        );
+            "UPDATE user SET password = 'love' WHERE name = 'gary'");
         BOOST_CHECK(1 == affectedRows);
 
         // Test some injection safety
         const string injection("'; CREATE TABLE dummy (i INT); -- ");
         affectedRows = connection->runCommand(
             "UPDATE user SET password = 'griffin' WHERE password = ?",
-            injection
-        );
+            injection);
         BOOST_CHECK(0 == affectedRows);
 
         // Test that incorrect number of parameters is handled
         BOOST_CHECK_THROW(
             connection->runCommand(
                 "UPDATE user SET password = 'griffin' WHERE password = ?"
-            ),
-            MySqlException
-        );
+),
+            MySqlException);
 
         BOOST_CHECK_THROW(
             connection->runCommand(
                 "UPDATE user SET password = 'griffin' WHERE password = ?",
                 injection,
-                injection
-            ),
-            MySqlException
-        );
-    }
-    catch (const exception& e)
-    {
+                injection),
+            MySqlException);
+    } catch (const exception& e) {
         BOOST_ERROR(e.what());
     }
 }
 
 
-void testRunQuery()
-{
-    try
-    {
+void testRunQuery() {
+    try {
         const char* const host = "localhost";
         unique_ptr<MySql> connection(
-            new MySql(host, username, password, database)
-        );
+            new MySql(host, username, password, database));
 
         createUserTable(connection);
 
         my_ulonglong affectedRows = connection->runCommand(
             "INSERT INTO user (name, password) VALUES "
             "('brandon', 'peace'), "
-            "('gary', NULL)"
-        );
+            "('gary', NULL)");
         BOOST_CHECK(2 == affectedRows);
 
         // Selecting NULLs without a std::shared_ptr should throw
@@ -155,25 +130,21 @@ void testRunQuery()
         BOOST_CHECK_THROW(
             connection->runQuery(
                 &rawTypeValues,
-                "SELECT name, password FROM user"
-            ),
-            MySqlException
-        );
+                "SELECT name, password FROM user"),
+            MySqlException);
         rawTypeValues.clear();
 
         // Selecting NULLs with std::shared_ptr should be fine though
         vector<tuple<shared_ptr<string>, shared_ptr<string>>> sharedPtrValues;
         connection->runQuery(
             &sharedPtrValues,
-            "SELECT name, password FROM user ORDER BY id ASC"
-        );
+            "SELECT name, password FROM user ORDER BY id ASC");
         BOOST_CHECK(
             2 == sharedPtrValues.size()
             && nullptr != get<0>(sharedPtrValues.at(0))
             && nullptr != get<1>(sharedPtrValues.at(0))
             && nullptr != get<0>(sharedPtrValues.at(1))
-            && nullptr == get<1>(sharedPtrValues.at(1))
-        );
+            && nullptr == get<1>(sharedPtrValues.at(1)));
         sharedPtrValues.clear();
 
         // Test some injection safety
@@ -181,51 +152,40 @@ void testRunQuery()
         connection->runQuery(
             &sharedPtrValues,
             "SELECT name, password FROM user WHERE id = ?",
-            injection
-        );
+            injection);
         BOOST_CHECK(0 == sharedPtrValues.size());
 
         // Test that incorrect number of parameters is handled
         BOOST_CHECK_THROW(
             connection->runQuery(
                 &sharedPtrValues,
-                "SELECT name, password FROM user WHERE id = ?"
-            ),
-            MySqlException
-        );
+                "SELECT name, password FROM user WHERE id = ?"),
+            MySqlException);
         BOOST_CHECK_THROW(
             connection->runQuery(
                 &sharedPtrValues,
                 "SELECT name, password FROM user WHERE id = ?",
                 injection,
-                injection
-            ),
-            MySqlException
-        );
-    }
-    catch (const exception& e)
-    {
+                injection),
+            MySqlException);
+    } catch (const exception& e) {
         BOOST_ERROR(e.what());
     }
 }
 
 
-void testInvalidCommands()
-{
-    try
-    {
+void testInvalidCommands() {
+    try {
         const char* const host = "localhost";
         unique_ptr<MySql> connection(
-            new MySql(host, username, password, database)
-        );
+            new MySql(host, username, password, database));
 
         createUserTable(connection);
 
         my_ulonglong affectedRows = connection->runCommand(
             "INSERT INTO user (name, password) VALUES "
             "('brandon', 'peace'), "
-            "('gary', NULL)"
-        );
+            "('gary', NULL)");
         BOOST_CHECK(2 == affectedRows);
 
         // Run a query using runCommand
@@ -233,66 +193,52 @@ void testInvalidCommands()
         // no additional arguments, so test both
         BOOST_CHECK_THROW(
             connection->runCommand(
-                "SELECT * FROM user"
-            ),
-            MySqlException
-        );
+                "SELECT * FROM user"),
+            MySqlException);
         int arg = 1;
         BOOST_CHECK_THROW(
             connection->runCommand(
                 "SELECT * FROM user WHERE id IN (?)",
-                arg
-            ),
-            MySqlException
-        );
+                arg),
+            MySqlException);
 
         // Run a command using runQuery
         vector<tuple<shared_ptr<string>, shared_ptr<string>>> sharedPtrValues;
         BOOST_CHECK_THROW(
             connection->runQuery(
                 &sharedPtrValues,
-                "UPDATE user SET name = 'brandon2' WHERE name = 'brandon'"
-            ),
-            MySqlException
-        );
+                "UPDATE user SET name = 'brandon2' WHERE name = 'brandon'"),
+            MySqlException);
         sharedPtrValues.clear();
         // If a command is given to runQuery, it shouldn't be run...
         vector<tuple<int>> counts;
         connection->runQuery(
             &counts,
-            "SELECT COUNT(*) FROM user WHERE name = 'brandon2'"
-        );
+            "SELECT COUNT(*) FROM user WHERE name = 'brandon2'");
         BOOST_CHECK(1 == counts.size());
-        if (1 == counts.size())
-        {
+        if (1 == counts.size()) {
             BOOST_CHECK_MESSAGE(
                 0 == get<0>(counts.at(0)),
                 "Incorrect use of runQuery for running commands should not"
-                    " run the provided command"
-            );
+                    " run the provided command");
         }
         counts.clear();
 
         // Too few arguments for runCommand
         BOOST_CHECK_THROW(
             connection->runCommand(
-                "UPDATE user SET name = 'brandon2' WHERE name = ?"
-            ),
-            MySqlException
-        );
+                "UPDATE user SET name = 'brandon2' WHERE name = ?"),
+            MySqlException);
         // Invalid numbers of arguments shouldn't be run
         connection->runQuery(
             &counts,
-            "SELECT COUNT(*) FROM user WHERE name = 'brandon2'"
-        );
+            "SELECT COUNT(*) FROM user WHERE name = 'brandon2'");
         BOOST_CHECK(1 == counts.size());
-        if (1 == counts.size())
-        {
+        if (1 == counts.size()) {
             BOOST_CHECK_MESSAGE(
                 0 == get<0>(counts.at(0)),
                 "Incorrect parameters for running commands should not"
-                    " run the provided command"
-            );
+                    " run the provided command");
         }
         counts.clear();
 
@@ -302,23 +248,18 @@ void testInvalidCommands()
             connection->runCommand(
                 "UPDATE user SET name = 'brandon2' WHERE name = ?",
                 brandon,
-                brandon
-            ),
-            MySqlException
-        );
+                brandon),
+            MySqlException);
         // Invalid numbers of arguments shouldn't be run
         connection->runQuery(
             &counts,
-            "SELECT COUNT(*) FROM user WHERE name = 'brandon2'"
-        );
+            "SELECT COUNT(*) FROM user WHERE name = 'brandon2'");
         BOOST_CHECK(1 == counts.size());
-        if (1 == counts.size())
-        {
+        if (1 == counts.size()) {
             BOOST_CHECK_MESSAGE(
                 0 == get<0>(counts.at(0)),
                 "Incorrect parameters for running commands should not"
-                    " run the provided command"
-            );
+                    " run the provided command");
         }
         counts.clear();
 
@@ -326,10 +267,8 @@ void testInvalidCommands()
         BOOST_CHECK_THROW(
             connection->runQuery(
                 &sharedPtrValues,
-                "SELECT name, password FROM user WHERE name = ?"
-            ),
-            MySqlException
-        );
+                "SELECT name, password FROM user WHERE name = ?"),
+            MySqlException);
 
         // Too many arguments for runCommand
         BOOST_CHECK_THROW(
@@ -337,83 +276,64 @@ void testInvalidCommands()
                 &sharedPtrValues,
                 "SELECT name, password FROM user WHERE name = ?",
                 brandon,
-                brandon
-            ),
-            MySqlException
-        );
+                brandon),
+            MySqlException);
 
         // Invalid syntax
         BOOST_CHECK_THROW(
             connection->runCommand("Dance for me, MySQL!"),
-            MySqlException
-        );
+            MySqlException);
         BOOST_CHECK_THROW(
             connection->runCommand("Dance for me, MySQL!", brandon),
-            MySqlException
-        );
+            MySqlException);
         BOOST_CHECK_THROW(
             connection->runQuery(
                 &counts,
-                "Dance for me, MySQL!"
-            ),
-            MySqlException
-        );
+                "Dance for me, MySQL!"),
+            MySqlException);
         BOOST_CHECK(0 == counts.size());
         counts.clear();
         BOOST_CHECK_THROW(
             connection->runQuery(
                 &counts,
                 "Dance for me, MySQL!",
-                brandon
-            ),
-            MySqlException
-        );
+                brandon),
+            MySqlException);
         BOOST_CHECK(0 == counts.size());
         counts.clear();
 
         // Invalid semantics
         BOOST_CHECK_THROW(
             connection->runCommand("INSERT INTO nonexistent_table VALUES (1)"),
-            MySqlException
-        );
+            MySqlException);
         BOOST_CHECK_THROW(
             connection->runCommand(
                 "INSERT INTO nonexistent_table VALUES (1)",
-                brandon
-            ),
-            MySqlException
-        );
+                brandon),
+            MySqlException);
         BOOST_CHECK_THROW(
             connection->runQuery(
                 &counts,
-                "SELECT 1 FROM nonexistent_table"
-            ),
-            MySqlException
-        );
+                "SELECT 1 FROM nonexistent_table"),
+            MySqlException);
         BOOST_CHECK(0 == counts.size());
         counts.clear();
         BOOST_CHECK_THROW(
             connection->runQuery(
                 &counts,
                 "SELECT 1 FROM nonexistent_table",
-                brandon
-            ),
-            MySqlException
-        );
+                brandon),
+            MySqlException);
         BOOST_CHECK(0 == counts.size());
-    }
-    catch (const exception& e)
-    {
+    } catch (const exception& e) {
         BOOST_ERROR(e.what());
     }
 }
 
 
-void createUserTable(const unique_ptr<MySql>& connection)
-{
+void createUserTable(const unique_ptr<MySql>& connection) {
     my_ulonglong affectedRows = connection->runCommand(
-        "DROP TABLE IF EXISTS user"
-    );
+        "DROP TABLE IF EXISTS user");
     BOOST_CHECK(0 == affectedRows);
 
     affectedRows = connection->runCommand(
@@ -422,8 +342,7 @@ void createUserTable(const unique_ptr<MySql>& connection)
             "name VARCHAR(20) NOT NULL,"
             "password VARCHAR(20),"
             "UNIQUE (name)"
-        ")"
-    );
+        ")");
     BOOST_CHECK(0 == affectedRows);
 }
 
@@ -431,8 +350,7 @@ void createUserTable(const unique_ptr<MySql>& connection)
 void testSimpleSelects(
     const unique_ptr<MySql>& connection,
     const char* const host
-)
-{
+) {
     vector<tuple<shared_ptr<string>>> results;
 
     connection->runQuery(&results, "SELECT USER()");
@@ -440,14 +358,12 @@ void testSimpleSelects(
     BOOST_CHECK(
         1 == results.size()
         && nullptr != get<0>(results.at(0))
-        && user == *get<0>(results.at(0))
-    );
+        && user == *get<0>(results.at(0)));
     results.clear();
 
     connection->runQuery(&results, "SELECT DATABASE()");
     BOOST_CHECK(
         1 == results.size()
-        && database == *get<0>(results.at(0))
-    );
+        && database == *get<0>(results.at(0)));
     results.clear();
 }

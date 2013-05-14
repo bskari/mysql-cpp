@@ -1,21 +1,22 @@
+#include <cstdint>
+#include <mysql/mysql.h>
+
+#include <boost/test/unit_test.hpp>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "testOutputBinder.hpp"
 #include "../MySqlException.hpp"
 #include "../OutputBinder.hpp"
-
-#include <cstdint>
-#include <boost/test/unit_test.hpp>
-#include <memory>
-#include <mysql/mysql.h>
-#include <string>
-#include <vector>
 
 using std::shared_ptr;
 using std::string;
 using std::vector;
 
 
-void testSetResult()
-{
+void testSetResult() {
+    unsigned int randSeed = 0;
     MYSQL_BIND bind;
     my_bool nullFlag = false;
 
@@ -24,7 +25,7 @@ void testSetResult()
 #ifndef TYPE_TEST_SET_RESULT
 #define TYPE_TEST_SET_RESULT(type) \
     { \
-    type result = rand(); \
+    type result = rand_r(&randSeed); \
     bind.buffer = &result; \
     bind.is_null = &nullFlag; \
     type output; \
@@ -34,10 +35,10 @@ void testSetResult()
     }
 #endif
 
-    TYPE_TEST_SET_RESULT(int)
-    TYPE_TEST_SET_RESULT(float)
-    TYPE_TEST_SET_RESULT(double)
-    TYPE_TEST_SET_RESULT(char)
+    TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+    TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
+    TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+    TYPE_TEST_SET_RESULT(char)   // NOLINT[readability/casting]
     TYPE_TEST_SET_RESULT(int8_t)
     TYPE_TEST_SET_RESULT(uint8_t)
     TYPE_TEST_SET_RESULT(int16_t)
@@ -48,13 +49,13 @@ void testSetResult()
     TYPE_TEST_SET_RESULT(uint64_t)
 
     // std::string test
-    {
+    {  // NOLINT[whitespace/parens]
         string result(" ", 5);
         vector<char> buffer(result.size());
-        for (size_t i = 0; i < result.size(); ++i)
-        {
+        for (size_t i = 0; i < result.size(); ++i) {
             // Let's avoid \0
-            buffer.at(i) = result.at(i) = (char)(rand() % 10 + 'a');
+            buffer.at(i) = result.at(i) = static_cast<char>(
+                (rand_r(&randSeed) % 10 + 'a'));
         }
         buffer.push_back('\0');
         bind.buffer = &buffer.at(0);
@@ -68,7 +69,7 @@ void testSetResult()
     return;
 
     // std::shared_ptr with NULL test
-    {
+    {  // NOLINT[whitespace/parens]
         float output;
         shared_ptr<decltype(output)> ptr;
         nullFlag = true;
@@ -80,8 +81,8 @@ void testSetResult()
     }
 
     // std::shared_ptr with a value test
-    {
-        float output = rand();
+    {  // NOLINT[whitespace/parens]
+        float output = rand_r(&randSeed);
         shared_ptr<decltype(output)> ptr;
         nullFlag = false;
         bind.buffer = &output;
@@ -89,18 +90,17 @@ void testSetResult()
         OutputBinderResultSetter<decltype(output)> setter;
         setter.setResult(&output, bind);
         BOOST_CHECK(0 != ptr.get());
-        if (0 != ptr.get())
-        {
+        if (0 != ptr.get()) {
             BOOST_CHECK(output == *ptr);
         }
     }
 
     // Trying to set a NULL value with a non-std::shared_ptr parameter should
     // throw
-    {
-        float output = rand();
+    {  // NOLINT[whitespace/parens]
+        float output = rand_r(&randSeed);
         nullFlag = true;
-        bind.buffer = &output ;
+        bind.buffer = &output;
         bind.is_null = &nullFlag;
         OutputBinderResultSetter<decltype(output)> setter;
         BOOST_CHECK_THROW(setter.setResult(&output, bind), MySqlException);
@@ -108,8 +108,7 @@ void testSetResult()
 }
 
 
-void testSetParameter()
-{
+void testSetParameter() {
     MYSQL_BIND bind;
     my_bool nullFlag;
 
@@ -123,7 +122,8 @@ void testSetParameter()
     setter.setParameter(&bind, &buffer, &nullFlag); \
     BOOST_CHECK(sizeof(type) == buffer.size()); \
     BOOST_CHECK(bind.buffer == &buffer.at(0)); \
-    BOOST_CHECK((bool)bind.is_unsigned == (bool)isUnsigned); \
+    BOOST_CHECK(static_cast<bool>(bind.is_unsigned) \
+        == static_cast<bool>(isUnsigned)); \
     BOOST_CHECK(bind.is_null == &nullFlag); \
     }
 #endif
@@ -141,7 +141,7 @@ void testSetParameter()
 
     // User defined types should default to a string that boost::lexical_cast
     // will convert
-    {
+    {  // NOLINT[whitespace/parens]
         class UserType {};
         vector<char> buffer;
         OutputBinderParameterSetter<UserType> setter;
@@ -159,7 +159,8 @@ void testSetParameter()
     setter.setParameter(&bind, &buffer, &nullFlag); \
     BOOST_CHECK(sizeof(type) == buffer.size()); \
     BOOST_CHECK(bind.buffer == &buffer.at(0)); \
-    BOOST_CHECK((bool)bind.is_unsigned == (bool)isUnsigned); \
+    BOOST_CHECK(static_cast<bool>(bind.is_unsigned) \
+        == static_cast<bool>(isUnsigned)); \
     BOOST_CHECK(bind.is_null == &nullFlag); \
     }
 #endif

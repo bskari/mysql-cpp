@@ -1,11 +1,9 @@
+#include <boost/test/included/unit_test.hpp>
+#include <string>
+
 #include "testInputBinder.hpp"
 #include "testMySql.hpp"
 #include "testOutputBinder.hpp"
-
-#include <boost/test/included/unit_test.hpp>
-#include <ctime>
-#include <cstdlib>
-#include <string>
 
 // Boost lets you name your tests, but I just want my tests to have the same
 // name as the function, so use this macro to fill them in
@@ -16,19 +14,14 @@
 namespace test = boost::unit_test;
 using std::string;
 
-test::test_suite* init_unit_test_suite(int, char*[])
-{
-    // Randomization in tests is bad!
-    srand(time(NULL));
-
+test::test_suite* init_unit_test_suite(int, char*[]) {
     typedef void(*testFunction)(void);
-    class FunctionDescription
-    {
+    class FunctionDescription {
         public:
             FunctionDescription(testFunction function, const char* name)
                 : function_(function)
                 , name_(name)
-            {
+            {  // NOLINT[whitespaces/braces]
             }
             testFunction function_;
             const string name_;
@@ -47,17 +40,13 @@ test::test_suite* init_unit_test_suite(int, char*[])
         FD(testInvalidCommands)
     };
 
-    for (size_t i = 0; i < sizeof(functions) / sizeof(functions[0]); ++i)
-    {
+    for (size_t i = 0; i < sizeof(functions) / sizeof(functions[0]); ++i) {
         test::framework::master_test_suite().add(
             test::make_test_case(
                 test::callback0<>(functions[i].function_),
                 test::literal_string(
                     functions[i].name_.c_str(),
-                    functions[i].name_.length()
-                )
-            )
-        );
+                    functions[i].name_.length())));
     }
 
     return 0;
