@@ -19,12 +19,12 @@ class MySqlException : public std::exception {
 
         const char* what() const throw();
 
+        static const char* getServerErrorMessage(
+            const MYSQL* const connection);
+        static const char* getServerErrorMessage(
+            const MYSQL_STMT* const statement);
     private:
         const std::string message_;
-        static inline const char* getServerErrorMessage(
-            const MYSQL* const connection);
-        static inline const char* getServerErrorMessage(
-            const MYSQL_STMT* const statement);
 };
 
 #endif  // MY_SQL_EXCEPTION_HPP_

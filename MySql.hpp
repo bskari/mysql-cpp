@@ -249,15 +249,14 @@ void MySql::runQuery(
 
 
 static void closeAndThrow(MYSQL_STMT* const statement) {
+    std::string errorMessage(MySqlException::getServerErrorMessage(statement));
     if (0 != mysql_stmt_free_result(statement)) {
-        // TODO(bskari|2013-03-23) Handle this error, or at least warn the
-        // user about the memory leak
+        errorMessage += "; There was an error freeing this statement";
     }
     if (0 != mysql_stmt_close(statement)) {
-        // TODO(bskari|2013-03-23) Handle this error, or at least warn the
-        // user about the memory leak
+        errorMessage += "; There was an error closing this statement";
     }
-    throw MySqlException(statement);
+    throw MySqlException(errorMessage);
 }
 
 
