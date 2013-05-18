@@ -90,9 +90,6 @@ class MySql {
 
 
 inline static void closeAndThrow(MYSQL_STMT* const statement);
-inline static void closeAndThrow(
-    MYSQL_STMT* const statement,
-    const char* const message);
 
 
 template<typename... Args>
@@ -258,22 +255,5 @@ static void closeAndThrow(MYSQL_STMT* const statement) {
     }
     throw MySqlException(errorMessage);
 }
-
-
-static void closeAndThrow(
-    MYSQL_STMT* const statement,
-    const char* const message
-) {
-    std::string errorMessage;
-    if (0 != mysql_stmt_free_result(statement)) {
-        errorMessage = "Unable to free result - ";
-    }
-    if (0 != mysql_stmt_close(statement)) {
-        errorMessage += "Unable to close statement - ";
-    }
-    errorMessage += message;
-    throw MySqlException(errorMessage);
-}
-
 
 #endif  // MYSQL_HPP_
