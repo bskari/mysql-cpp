@@ -45,3 +45,10 @@ clean:
 	rm -f examples
 	rm -f tests/*.o tests/*.gcno tests/*.gcov tests/*.gcna tests/*.gcda
 	rm -f test
+	rm -f coverage.info
+	rm -rf coverage
+
+.PHONY: coverage
+coverage:
+	lcov --capture --directory . --base-directory . --output-file coverage.info
+	genhtml coverage.info --output-directory coverage

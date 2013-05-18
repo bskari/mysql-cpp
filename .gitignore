@@ -22,3 +22,7 @@ test
 
 # Vim swap files
 .*.swp
+
+# Coverage files
+coverage.info
+coverage
