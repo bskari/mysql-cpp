@@ -242,6 +242,14 @@ void testInvalidCommands() {
         }
         counts.clear();
 
+        // Too few output parameters for runQuery
+        vector<tuple<shared_ptr<string>>> notEnoughParameters;
+        BOOST_CHECK_THROW(
+            connection->runQuery(
+                &notEnoughParameters,
+                "SELECT name, password FROM user"),
+            MySqlException);
+
         // Too many arguments for runCommand
         const string brandon("brandon");
         BOOST_CHECK_THROW(

@@ -1,9 +1,11 @@
 #include <cstdint>
+#include <cstdlib>
 #include <mysql/mysql.h>
 
 #include <boost/test/unit_test.hpp>
 #include <memory>
 #include <string>
+#include <sstream>
 #include <vector>
 
 #include "testOutputBinder.hpp"
@@ -12,7 +14,21 @@
 
 using std::shared_ptr;
 using std::string;
+using std::stringstream;
 using std::vector;
+
+/**
+ * Use this instead of boost::weakLexicalCast because we don't care about
+ * truncation errors.
+ */
+template <typename Target, typename Source>
+static Target weakLexicalCast(const Source& source) {
+    Target returnValue;
+    stringstream stream;
+    stream << source;
+    stream >> returnValue;
+    return returnValue;
+}
 
 
 void testSetResult() {
@@ -25,7 +41,7 @@ void testSetResult() {
 #ifndef TYPE_TEST_SET_RESULT
 #define TYPE_TEST_SET_RESULT(type) \
     { \
-    type result = rand_r(&randSeed); \
+    type result = weakLexicalCast<type>(rand_r(&randSeed)); \
     bind.buffer = &result; \
     bind.is_null = &nullFlag; \
     type output; \
@@ -34,7 +50,6 @@ void testSetResult() {
     BOOST_CHECK(result == output); \
     }
 #endif
-
     TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
     TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
     TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
@@ -47,8 +62,6 @@ void testSetResult() {
     TYPE_TEST_SET_RESULT(uint32_t)
     TYPE_TEST_SET_RESULT(int64_t)
     TYPE_TEST_SET_RESULT(uint64_t)
-
-    // std::string test
     {  // NOLINT[whitespace/parens]
         string result(" ", 5);
         vector<char> buffer(result.size());
@@ -66,45 +79,111 @@ void testSetResult() {
         BOOST_CHECK(result.size() == output.size());
         BOOST_CHECK(result == output);
     }
-    return;
 
     // std::shared_ptr with NULL test
-    {  // NOLINT[whitespace/parens]
-        float output;
-        shared_ptr<decltype(output)> ptr;
-        nullFlag = true;
-        bind.buffer = &output;
-        bind.is_null = &nullFlag;
-        OutputBinderResultSetter<decltype(output)> setter;
-        setter.setResult(&output, bind);
-        BOOST_CHECK(0 == ptr.get());
+#ifndef NULL_SHARED_PTR_TYPE_TEST_SET_RESULT
+#define NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(type) \
+    { \
+        type output = weakLexicalCast<type>(rand_r(&randSeed)); \
+        shared_ptr<type> result; \
+        nullFlag = true; \
+        bind.buffer = &output; \
+        bind.is_null = &nullFlag; \
+        OutputBinderResultSetter<decltype(result)> setter; \
+        setter.setResult(&result, bind); \
+        BOOST_CHECK(0 == result.get()); \
     }
+#endif
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(char)   // NOLINT[readability/casting]
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(int8_t)
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(uint8_t)
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(int16_t)
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(uint16_t)
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(int32_t)
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(uint32_t)
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(int64_t)
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(uint64_t)
+    NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(string)
 
     // std::shared_ptr with a value test
-    {  // NOLINT[whitespace/parens]
-        float output = rand_r(&randSeed);
-        shared_ptr<decltype(output)> ptr;
-        nullFlag = false;
-        bind.buffer = &output;
-        bind.is_null = &nullFlag;
-        OutputBinderResultSetter<decltype(output)> setter;
-        setter.setResult(&output, bind);
-        BOOST_CHECK(0 != ptr.get());
-        if (0 != ptr.get()) {
-            BOOST_CHECK(output == *ptr);
-        }
+#ifndef SHARED_PTR_TYPE_TEST_SET_RESULT
+#define SHARED_PTR_TYPE_TEST_SET_RESULT(type) \
+    { \
+        type output = weakLexicalCast<type>(rand_r(&randSeed)); \
+        shared_ptr<decltype(output)> ptr; \
+        bind.buffer = &output; \
+        nullFlag = false; \
+        bind.is_null = &nullFlag; \
+        OutputBinderResultSetter<decltype(ptr)> setter; \
+        setter.setResult(&ptr, bind); \
+        BOOST_CHECK(nullptr != ptr.get()); \
+        if (nullptr != ptr.get()) { \
+            BOOST_CHECK(output == *ptr); \
+        } \
     }
+#endif
+    SHARED_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+    SHARED_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
+    SHARED_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+    SHARED_PTR_TYPE_TEST_SET_RESULT(int8_t)
+    SHARED_PTR_TYPE_TEST_SET_RESULT(uint8_t)
+    SHARED_PTR_TYPE_TEST_SET_RESULT(int16_t)
+    SHARED_PTR_TYPE_TEST_SET_RESULT(uint16_t)
+    SHARED_PTR_TYPE_TEST_SET_RESULT(int32_t)
+    SHARED_PTR_TYPE_TEST_SET_RESULT(uint32_t)
+    SHARED_PTR_TYPE_TEST_SET_RESULT(int64_t)
+    SHARED_PTR_TYPE_TEST_SET_RESULT(uint64_t)
+    {  // NOLINT[whitespace/parens]
+        string result(" ", 5);
+        shared_ptr<decltype(result)> ptr;
+        vector<char> buffer(result.size());
+        for (size_t i = 0; i < result.size(); ++i) {
+            // Let's avoid \0
+            buffer.at(i) = result.at(i) = static_cast<char>(
+                (rand_r(&randSeed) % 10 + 'a'));
+        }
+        buffer.push_back('\0');
+        bind.buffer = &buffer.at(0);
+        nullFlag = false;
+        bind.is_null = &nullFlag;
+        OutputBinderResultSetter<decltype(ptr)> setter;
+        setter.setResult(&ptr, bind);
+        BOOST_CHECK(nullptr != ptr.get());
+        if (nullptr != ptr.get()) {
+            BOOST_CHECK(result.size() == ptr->size());
+            BOOST_CHECK(result == *ptr);
+        }
+        }
 
     // Trying to set a NULL value with a non-std::shared_ptr parameter should
     // throw
-    {  // NOLINT[whitespace/parens]
-        float output = rand_r(&randSeed);
-        nullFlag = true;
-        bind.buffer = &output;
-        bind.is_null = &nullFlag;
-        OutputBinderResultSetter<decltype(output)> setter;
-        BOOST_CHECK_THROW(setter.setResult(&output, bind), MySqlException);
+#ifndef NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT
+#define NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(type) \
+    { \
+        type output = weakLexicalCast<type>(rand_r(&randSeed)); \
+        nullFlag = true; \
+        bind.buffer = &output; \
+        bind.is_null = &nullFlag; \
+        OutputBinderResultSetter<decltype(output)> setter; \
+        BOOST_CHECK_THROW(setter.setResult(&output, bind), MySqlException); \
     }
+#endif
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(char)   // NOLINT[readability/casting]
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(int8_t)
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(uint8_t)
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(int16_t)
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(uint16_t)
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(int32_t)
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(uint32_t)
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(int64_t)
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(uint64_t)
+    NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(string)
 }
 
 

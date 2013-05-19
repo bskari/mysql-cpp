@@ -39,16 +39,19 @@ tests/testOutputBinder.o: tests/testOutputBinder.cpp \
 tests/testMySql.o: tests/testMySql.cpp tests/testMySql.hpp MySql.hpp
 
 .PHONY: clean
-clean:
-	rm -f *.o *.gcno *.gcov *.gcna *.gcda
+clean: clean-coverage
+	rm -f *.o tests/*.o
 	rm -f libmysqlcpp.so
 	rm -f examples
-	rm -f tests/*.o tests/*.gcno tests/*.gcov tests/*.gcna tests/*.gcda
 	rm -f test
+
+.PHONY: clean-coverage
+clean-coverage:
+	rm -f *.gcno *.gcov *.gcna *.gcda tests/*.gcno tests/*.gcov tests/*.gcna tests/*.gcda
 	rm -f coverage.info
 	rm -rf coverage
 
 .PHONY: coverage
-coverage:
+coverage: clean-coverage
 	lcov --capture --directory . --base-directory . --output-file coverage.info
 	genhtml coverage.info --output-directory coverage
