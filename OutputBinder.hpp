@@ -10,6 +10,8 @@
 #include <memory>
 #include <string>
 #include <tuple>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "MySqlException.hpp"
@@ -37,10 +39,19 @@ class OutputBinder {
 #endif
 
     private:
+        static MYSQL_BIND mysqlBindForDecltypeOnly_;
+        // The base type of the pointer MYSQL_BIND.length
+        typedef typename std::remove_reference<decltype(*std::declval<
+            // This expression should yield a pointer to unsigned integral type
+            typename std::remove_reference<decltype(
+                mysqlBindForDecltypeOnly_.length
+            )>::type
+        >())>::type mysql_bind_length_t;
+
         inline void refetchTruncatedColumns(
             std::vector<MYSQL_BIND>* const parameters,
             std::vector<std::vector<char>>* const buffers,
-            std::vector<uint64_t>* const lengths);
+            std::vector<mysql_bind_length_t>* const lengths);
 
         MYSQL_STMT* const statement_;
 
@@ -173,7 +184,7 @@ void OutputBinder<Args...>::setResults(
     memset(&parameters.at(0), 0, sizeof(parameters.at(0)) * parameters.size());
     std::vector<std::vector<char>> buffers;
     buffers.resize(fieldCount);
-    std::vector<uint64_t> lengths;
+    std::vector<mysql_bind_length_t> lengths;
     lengths.resize(fieldCount);
     std::vector<my_bool> nullFlags;
     nullFlags.resize(fieldCount);
@@ -251,7 +262,7 @@ template <typename... Args>
 void OutputBinder<Args...>::refetchTruncatedColumns(
     std::vector<MYSQL_BIND>* const parameters,
     std::vector<std::vector<char>>* const buffers,
-    std::vector<uint64_t>* const lengths
+    std::vector<mysql_bind_length_t>* const lengths
 ) {
     // Find which buffers were too small, expand them and refetch
     std::vector<std::tuple<size_t, size_t>> truncatedColumns;
