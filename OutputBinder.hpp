@@ -39,12 +39,11 @@ class OutputBinder {
 #endif
 
     private:
-        static MYSQL_BIND mysqlBindForDecltypeOnly_;
         // The base type of the pointer MYSQL_BIND.length
         typedef typename std::remove_reference<decltype(*std::declval<
             // This expression should yield a pointer to unsigned integral type
             typename std::remove_reference<decltype(
-                mysqlBindForDecltypeOnly_.length
+                std::declval<MYSQL_BIND>().length
             )>::type
         >())>::type mysql_bind_length_t;
 
