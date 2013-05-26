@@ -22,7 +22,7 @@ MySql::MySql(
     const char* password,
     const uint16_t port
 )
-    : MySql(hostname, username, password, nullptr, port)
+    : MySql{hostname, username, password, nullptr, port}
 {
 }
 #endif
@@ -35,7 +35,7 @@ MySql::MySql(
     const char* const database,
     const uint16_t port
 )
-    : connection_(mysql_init(nullptr))
+    : connection_{mysql_init(nullptr)}
 {
     if (nullptr == connection_) {
         throw MySqlException("Unable to connect to MySQL");
@@ -51,7 +51,7 @@ MySql::MySql(
         nullptr,
         0);
     if (nullptr == success) {
-        MySqlException mse(connection_);
+        MySqlException mse{connection_};
         mysql_close(connection_);
         throw mse;
     }
@@ -65,7 +65,7 @@ MySql::~MySql() {
 
 my_ulonglong MySql::runCommand(const char* const command) {
     if (0 != mysql_real_query(connection_, command, strlen(command))) {
-        throw MySqlException(connection_);
+        throw MySqlException{connection_};
     }
 
     // If the user ran a SELECT statement or something else, at least warn them
@@ -75,7 +75,7 @@ my_ulonglong MySql::runCommand(const char* const command) {
         MYSQL_RES* const result = mysql_store_result(connection_);
         mysql_free_result(result);
 
-        throw MySqlException("Tried to run query with runCommand");
+        throw MySqlException{"Tried to run query with runCommand"};
     }
 
     return affectedRows;

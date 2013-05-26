@@ -24,16 +24,16 @@ using std::vector;
 template <std::size_t> struct int_ {};  // compile-time counter
 
 template <typename Char, typename Traits, typename Tuple, std::size_t I>
-void printTuple(std::basic_ostream<Char, Traits>& out, Tuple const& t, int_<I>);
+void printTuple(basic_ostream<Char, Traits>& out, Tuple const& t, int_<I>);
 
 template <typename Char, typename Traits, typename Tuple>
-void printTuple(std::basic_ostream<Char, Traits>& out, Tuple const& t, int_<0>);
+void printTuple(basic_ostream<Char, Traits>& out, Tuple const& t, int_<0>);
 
 template <typename Char, typename Traits, typename... Args>
 ostream& operator<<(basic_ostream<Char, Traits>& out, tuple<Args...> const& t);
 
 template <typename T>
-void printSharedPtr(ostream& out, const shared_ptr<T>& ptr);
+ostream& operator<<(ostream& out, const shared_ptr<T>& ptr);
 
 
 int main(int argc, char* argv[]) {
@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
     } else {
         password = argv[1];
     }
-    MySql conn("127.0.0.1", "root", password.c_str(), nullptr);
+    MySql conn{"127.0.0.1", "root", password.c_str(), nullptr};
 
     // Initialize a new test database
     conn.runCommand("DROP DATABASE IF EXISTS test_mysql_cpp");
@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
     // *****************************************
     // All commands use safe prepared statements
     // *****************************************
-    const string naughtyUser("brandon@skari.org'; DROP TABLE users; -- ");
+    const string naughtyUser{"brandon@skari.org'; DROP TABLE users; -- "};
     conn.runQuery(&users, "SELECT * FROM user WHERE email = ?", naughtyUser);
     assert(0 == users.size());
 
@@ -130,21 +130,8 @@ int main(int argc, char* argv[]) {
     > autoPtrUserTuple;
     vector<autoPtrUserTuple> autoPtrUsers;
     conn.runQuery(&autoPtrUsers, "SELECT * FROM user");
-    const vector<autoPtrUserTuple>::iterator autoPtrEnd(autoPtrUsers.end());
-    for (
-        vector<autoPtrUserTuple>::iterator user(autoPtrUsers.begin());
-        user != autoPtrEnd;
-        ++user
-    ) {
-        cout << "(";
-        printSharedPtr(cout, get<0>(*user));
-        cout << ", ";
-        printSharedPtr(cout, get<1>(*user));
-        cout << ", ";
-        printSharedPtr(cout, get<2>(*user));
-        cout << ", ";
-        printSharedPtr(cout, get<3>(*user));
-        cout << ")" << endl;
+    for (const auto& user : autoPtrUsers) {
+        cout << user << endl;
     }
 
 
@@ -194,10 +181,11 @@ ostream& operator<<(
 }
 
 template <typename T>
-void printSharedPtr(ostream& out, const shared_ptr<T>& ptr) {
+ostream& operator<<(ostream& out, const shared_ptr<T>& ptr) {
     if (nullptr != ptr.get()) {
         out << *ptr;
     } else {
         out << "NULL";
     }
+    return out;
 }

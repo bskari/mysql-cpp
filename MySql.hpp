@@ -31,21 +31,18 @@ class MySql {
             const char* const database,
             const uint16_t port = 3306);
 
-        // Delegating constructors are supported in GCC 4.7
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 7)
         MySql(
             const char* hostname,
             const char* username,
             const char* password,
             const uint16_t port = 3306);
-#endif
+
         ~MySql();
 
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
-        // Deleted constructors are supported in GCC 4.4
         MySql(const MySql& rhs) = delete;
+        MySql(MySql&& rhs) = delete;
         MySql& operator=(const MySql& rhs) = delete;
-#endif
+        MySql& operator=(MySql&& rhs) = delete;
 
         /**
          * Normal query. Results are stored in the given vector.
@@ -81,11 +78,7 @@ class MySql {
     private:
         MYSQL* connection_;
 
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 4)
         // Hidden methods
-        MySql(const MySql& rhs);
-        MySql& operator=(const MySql& rhs);
-#endif
 };
 
 
@@ -99,7 +92,7 @@ my_ulonglong MySql::runCommand(
 ) {
     MYSQL_STMT* const statement = mysql_stmt_init(connection_);
     if (nullptr == statement) {
-        throw MySqlException(connection_);
+        throw MySqlException{connection_};
     }
 
     const size_t length = ::strlen(command);
@@ -118,7 +111,7 @@ my_ulonglong MySql::runCommand(
             errorMessage += "Unable to close statement - ";
         }
         errorMessage += "Tried to run query with runCommand";
-        throw MySqlException(errorMessage);
+        throw MySqlException{errorMessage};
     }
 
     const size_t parameterCount = mysql_stmt_param_count(statement);
@@ -135,7 +128,7 @@ my_ulonglong MySql::runCommand(
         errorMessage += " but ";
         errorMessage += boost::lexical_cast<std::string>(sizeof...(args));
         errorMessage += " parameters were provided.";
-        throw MySqlException(errorMessage);
+        throw MySqlException{errorMessage};
     }
 
     std::vector<MYSQL_BIND> bindParameters;
@@ -163,10 +156,10 @@ my_ulonglong MySql::runCommand(
             errorMessage += "Unable to close statement - ";
         }
         errorMessage += "Unable to free result";
-        throw MySqlException(errorMessage);
+        throw MySqlException{errorMessage};
     }
     if (0 != mysql_stmt_close(statement)) {
-        throw MySqlException("Unable to close statement");
+        throw MySqlException{"Unable to close statement"};
     }
     return affectedRows;
 }
@@ -197,7 +190,7 @@ void MySql::runQuery(
             errorMessage += "Unable to close statement - ";
         }
         errorMessage += "Tried to run command with runQuery";
-        throw MySqlException(errorMessage);
+        throw MySqlException{errorMessage};
     }
 
     // Bind the input parameters
@@ -217,7 +210,7 @@ void MySql::runQuery(
         errorMessage += " but ";
         errorMessage += boost::lexical_cast<std::string>(sizeof...(args));
         errorMessage += " parameters were provided.";
-        throw MySqlException(errorMessage);
+        throw MySqlException{errorMessage};
     }
 
     std::vector<MYSQL_BIND> inputBindParameters;
@@ -228,7 +221,7 @@ void MySql::runQuery(
         closeAndThrow(statement);
     }
 
-    OutputBinder<OutputArgs...> outputBinder(statement);
+    OutputBinder<OutputArgs...> outputBinder{statement};
     outputBinder.setResults(results);
 
     // Cleanup
@@ -237,10 +230,10 @@ void MySql::runQuery(
         if (0 != mysql_stmt_close(statement)) {
             errorMessage += " - Unable to close statement";
         }
-        throw MySqlException(errorMessage);
+        throw MySqlException{errorMessage};
     }
     if (0 != mysql_stmt_close(statement)) {
-        throw MySqlException("Unable to close statement");
+        throw MySqlException{"Unable to close statement"};
     }
 }
 
@@ -253,7 +246,7 @@ static void closeAndThrow(MYSQL_STMT* const statement) {
     if (0 != mysql_stmt_close(statement)) {
         errorMessage += "; There was an error closing this statement";
     }
-    throw MySqlException(errorMessage);
+    throw MySqlException{errorMessage};
 }
 
 #endif  // MYSQL_HPP_

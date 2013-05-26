@@ -6,27 +6,28 @@
 using std::string;
 
 MySqlException::MySqlException(const string& message)
-    : message_(message)
+    : message_{message}
 {
 }
 
 
 MySqlException::MySqlException(const MYSQL* const connection)
-    : message_(getServerErrorMessage(connection))
+    : message_{getServerErrorMessage(connection)}
 {
 }
 
 
 MySqlException::MySqlException(const MYSQL_STMT* const statement)
-    : message_(getServerErrorMessage(statement))
+    : message_{getServerErrorMessage(statement)}
 {
 }
 
-MySqlException::~MySqlException() throw() {
+
+MySqlException::~MySqlException() noexcept {
 }
 
 
-const char* MySqlException::what() const throw() {
+const char* MySqlException::what() const noexcept {
     return message_.c_str();
 }
 

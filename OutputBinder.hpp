@@ -26,17 +26,17 @@ class OutputBinder {
     public:
         explicit OutputBinder(MYSQL_STMT* const statement);
 
+        ~OutputBinder() = default;
+
+        OutputBinder(const OutputBinder& rhs) = delete;
+        OutputBinder(OutputBinder&& rhs) = delete;
+        OutputBinder& operator=(const OutputBinder& rhs) = delete;
+        OutputBinder& operator=(OutputBinder&& rhs) = delete;
+
         // Should this just be combined into the constructor? On one hand,
         // creating an instance of this class and then not calling any methods
         // from it seems weird.
         void setResults(std::vector<std::tuple<Args...>>* const results);
-
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
-        // Deleted and defaulted constructors are supported in GCC 4.4
-        ~OutputBinder() = default;
-        OutputBinder(const OutputBinder& rhs) = delete;
-        OutputBinder& operator=(const OutputBinder& rhs) = delete;
-#endif
 
     private:
         // The base type of the pointer MYSQL_BIND.length
@@ -53,12 +53,6 @@ class OutputBinder {
             std::vector<mysql_bind_length_t>* const lengths);
 
         MYSQL_STMT* const statement_;
-
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 4)
-        // Hidden methods
-        OutputBinder(const OutputBinder& rhs);
-        OutputBinder& operator=(const OutputBinder& rhs);
-#endif
 };
 
 
@@ -153,7 +147,7 @@ class OutputBinderParameterSetter<T*> {
 
 template <typename... Args>
 OutputBinder<Args...>::OutputBinder(MYSQL_STMT* const statement)
-    : statement_(statement)
+    : statement_{statement}
 {
 }
 
@@ -167,20 +161,17 @@ void OutputBinder<Args...>::setResults(
     const size_t fieldCount = mysql_stmt_field_count(statement_);
     if (fieldCount != sizeof...(Args)) {
         mysql_stmt_close(statement_);
-        std::string errorMessage(
-            "Incorrect number of output parameters; query required ");
+        std::string errorMessage{
+            "Incorrect number of output parameters; query required "};
         errorMessage += boost::lexical_cast<std::string>(fieldCount);
         errorMessage += " but ";
         errorMessage += boost::lexical_cast<std::string>(sizeof...(Args));
         errorMessage += " parameters were provided";
-        throw MySqlException(errorMessage);
+        throw MySqlException{errorMessage};
     }
 
-    std::vector<MYSQL_BIND> parameters;
+    std::vector<MYSQL_BIND> parameters{};
     parameters.resize(fieldCount);
-    // TODO(bskari|2013-03-18) Is this necessary, or will the defaulted C++
-    // constructor for MYSQL_BIND handle it?
-    memset(&parameters.at(0), 0, sizeof(parameters.at(0)) * parameters.size());
     std::vector<std::vector<char>> buffers;
     buffers.resize(fieldCount);
     std::vector<mysql_bind_length_t> lengths;
@@ -197,7 +188,7 @@ void OutputBinder<Args...>::setResults(
         &parameters,
         &buffers,
         &nullFlags,
-        OutputBinderNamespace::int_<sizeof...(Args) - 1>());
+        OutputBinderNamespace::int_<sizeof...(Args) - 1>{});
 
     for (size_t i = 0; i < buffers.size(); ++i) {
         // This doesn't need to be set on every type, but it won't hurt
@@ -206,13 +197,13 @@ void OutputBinder<Args...>::setResults(
         parameters.at(i).length = &lengths.at(i);
     }
     if (0 != mysql_stmt_bind_result(statement_, &parameters.at(0))) {
-        MySqlException mse(mysql_stmt_error(statement_));
+        MySqlException mse{mysql_stmt_error(statement_)};
         mysql_stmt_close(statement_);
         throw mse;
     }
 
     if (0 != mysql_stmt_execute(statement_)) {
-        MySqlException mse(mysql_stmt_error(statement_));
+        MySqlException mse{mysql_stmt_error(statement_)};
         mysql_stmt_close(statement_);
         throw mse;
     }
@@ -228,7 +219,7 @@ void OutputBinder<Args...>::setResults(
             setResultTuple(
                 &rowTuple,
                 parameters,
-                OutputBinderNamespace::int_<sizeof...(Args) - 1>());
+                OutputBinderNamespace::int_<sizeof...(Args) - 1>{});
         } catch (...) {
             mysql_stmt_close(statement_);
             throw;
@@ -243,13 +234,13 @@ void OutputBinder<Args...>::setResults(
             // No problem! All rows fetched.
             break;
         case 1: {  // Error occurred {
-            MySqlException mse(mysql_stmt_error(statement_));
+            MySqlException mse{mysql_stmt_error(statement_)};
             mysql_stmt_close(statement_);
             throw mse;
         }
         default: {
             assert(false && "Unknown error code from mysql_stmt_fetch");
-            MySqlException mse(mysql_stmt_error(statement_));
+            MySqlException mse{mysql_stmt_error(statement_)};
             mysql_stmt_close(statement_);
             throw mse;
         }
@@ -305,7 +296,7 @@ void OutputBinder<Args...>::refetchTruncatedColumns(
             column,
             offset);
         if (0 != status) {
-            MySqlException mse(mysql_stmt_error(statement_));
+            MySqlException mse{mysql_stmt_error(statement_)};
             mysql_stmt_close(statement_);
             throw mse;
         }
@@ -318,7 +309,7 @@ void OutputBinder<Args...>::refetchTruncatedColumns(
 
     // If we've changed the buffers, we need to rebind
     if (0 != mysql_stmt_bind_result(statement_, &parameters->at(0))) {
-        MySqlException mse(mysql_stmt_error(statement_));
+        MySqlException mse{mysql_stmt_error(statement_)};
         mysql_stmt_close(statement_);
         throw mse;
     }
@@ -338,7 +329,7 @@ void setResultTuple(
     setResultTuple(
         tuple,
         outputParameters,
-        OutputBinderNamespace::int_<I - 1>());
+        OutputBinderNamespace::int_<I - 1>{});
 }
 
 

@@ -37,7 +37,7 @@ to worry about injection attacks. `mysql-cpp` will infer the types of the
 objects you're sending and automatically create and run the prepared statement.
 
     int age = 29;
-    string username = "brandon' DROP TABLE user; -- ";
+    string username = "brandon'; DROP TABLE user; -- ";
     connection->runCommand(
         "UPDATE user SET age = ? WHERE username = ?",
         age,

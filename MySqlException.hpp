@@ -6,18 +6,17 @@
 #include <exception>
 #include <string>
 
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 6)
-#define nullptr 0
-#endif
-
 class MySqlException : public std::exception {
     public:
         explicit MySqlException(const std::string& message);
         explicit MySqlException(const MYSQL* const connection);
         explicit MySqlException(const MYSQL_STMT* const statement);
-        ~MySqlException() throw();
+        ~MySqlException() noexcept;
 
-        const char* what() const throw();
+        MySqlException& operator=(const MySqlException&) = delete;
+        MySqlException& operator=(MySqlException&&) = delete;
+
+        const char* what() const noexcept;
 
         static const char* getServerErrorMessage(
             const MYSQL* const connection);
