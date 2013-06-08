@@ -16,49 +16,37 @@
 
 #include "MySqlException.hpp"
 
+/**
+ * Saves the results from the SQL query into the vector of tuples. This is the
+ * only function in tis file that should be called from externally.
+ */
+template <typename... Args>
+void setResults(
+    MYSQL_STMT* const statement,
+    std::vector<std::tuple<Args...>>* const results);
+
 
 static const char NULL_VALUE_ERROR_MESSAGE[] = \
     "Null value encountered with non-shared_ptr output type";
 
+// The base type of the pointer MYSQL_BIND.length
+typedef typename std::remove_reference<decltype(*std::declval<
+    // This expression should yield a pointer to unsigned integral type
+    typename std::remove_reference<decltype(
+        std::declval<MYSQL_BIND>().length
+    )>::type
+>())>::type mysql_bind_length_t;
 
-template <typename... Args>
-class OutputBinder {
-    public:
-        explicit OutputBinder(MYSQL_STMT* const statement);
-
-        ~OutputBinder() = default;
-
-        OutputBinder(const OutputBinder& rhs) = delete;
-        OutputBinder(OutputBinder&& rhs) = delete;
-        OutputBinder& operator=(const OutputBinder& rhs) = delete;
-        OutputBinder& operator=(OutputBinder&& rhs) = delete;
-
-        // Should this just be combined into the constructor? On one hand,
-        // creating an instance of this class and then not calling any methods
-        // from it seems weird.
-        void setResults(std::vector<std::tuple<Args...>>* const results);
-
-    private:
-        // The base type of the pointer MYSQL_BIND.length
-        typedef typename std::remove_reference<decltype(*std::declval<
-            // This expression should yield a pointer to unsigned integral type
-            typename std::remove_reference<decltype(
-                std::declval<MYSQL_BIND>().length
-            )>::type
-        >())>::type mysql_bind_length_t;
-
-        inline void refetchTruncatedColumns(
-            std::vector<MYSQL_BIND>* const parameters,
-            std::vector<std::vector<char>>* const buffers,
-            std::vector<mysql_bind_length_t>* const lengths);
-
-        MYSQL_STMT* const statement_;
-};
-
+static void refetchTruncatedColumns(
+    MYSQL_STMT* const statement,
+    std::vector<MYSQL_BIND>* const parameters,
+    std::vector<std::vector<char>>* const buffers,
+    std::vector<mysql_bind_length_t>* const lengths);
 
 namespace OutputBinderNamespace {
     template<int I> struct int_ {};  // Compile-time counter
 }
+
 template<typename Tuple, int I>
 static void setResultTuple(
     Tuple* const tuple,
@@ -146,21 +134,15 @@ class OutputBinderParameterSetter<T*> {
 
 
 template <typename... Args>
-OutputBinder<Args...>::OutputBinder(MYSQL_STMT* const statement)
-    : statement_{statement}
-{
-}
-
-
-template <typename... Args>
-void OutputBinder<Args...>::setResults(
+void setResults(
+    MYSQL_STMT* const statement,
     std::vector<std::tuple<Args...>>* const results
 ) {
     // Bind the output parameters
     // Check that the sizes match
-    const size_t fieldCount = mysql_stmt_field_count(statement_);
+    const size_t fieldCount = mysql_stmt_field_count(statement);
     if (fieldCount != sizeof...(Args)) {
-        mysql_stmt_close(statement_);
+        mysql_stmt_close(statement);
         std::string errorMessage{
             "Incorrect number of output parameters; query required "};
         errorMessage += boost::lexical_cast<std::string>(fieldCount);
@@ -196,22 +178,22 @@ void OutputBinder<Args...>::setResults(
         // specializations simpler
         parameters.at(i).length = &lengths.at(i);
     }
-    if (0 != mysql_stmt_bind_result(statement_, &parameters.at(0))) {
-        MySqlException mse{mysql_stmt_error(statement_)};
-        mysql_stmt_close(statement_);
+    if (0 != mysql_stmt_bind_result(statement, &parameters.at(0))) {
+        MySqlException mse{mysql_stmt_error(statement)};
+        mysql_stmt_close(statement);
         throw mse;
     }
 
-    if (0 != mysql_stmt_execute(statement_)) {
-        MySqlException mse{mysql_stmt_error(statement_)};
-        mysql_stmt_close(statement_);
+    if (0 != mysql_stmt_execute(statement)) {
+        MySqlException mse{mysql_stmt_error(statement)};
+        mysql_stmt_close(statement);
         throw mse;
     }
 
-    int fetchStatus = mysql_stmt_fetch(statement_);
+    int fetchStatus = mysql_stmt_fetch(statement);
     while (0 == fetchStatus || MYSQL_DATA_TRUNCATED == fetchStatus) {
         if (MYSQL_DATA_TRUNCATED == fetchStatus) {
-            refetchTruncatedColumns(&parameters, &buffers, &lengths);
+            refetchTruncatedColumns(statement, &parameters, &buffers, &lengths);
         }
 
         std::tuple<Args...> rowTuple;
@@ -221,12 +203,12 @@ void OutputBinder<Args...>::setResults(
                 parameters,
                 OutputBinderNamespace::int_<sizeof...(Args) - 1>{});
         } catch (...) {
-            mysql_stmt_close(statement_);
+            mysql_stmt_close(statement);
             throw;
         }
 
         results->push_back(rowTuple);
-        fetchStatus = mysql_stmt_fetch(statement_);
+        fetchStatus = mysql_stmt_fetch(statement);
     }
 
     switch (fetchStatus) {
@@ -234,22 +216,22 @@ void OutputBinder<Args...>::setResults(
             // No problem! All rows fetched.
             break;
         case 1: {  // Error occurred {
-            MySqlException mse{mysql_stmt_error(statement_)};
-            mysql_stmt_close(statement_);
+            MySqlException mse{mysql_stmt_error(statement)};
+            mysql_stmt_close(statement);
             throw mse;
         }
         default: {
             assert(false && "Unknown error code from mysql_stmt_fetch");
-            MySqlException mse{mysql_stmt_error(statement_)};
-            mysql_stmt_close(statement_);
+            MySqlException mse{mysql_stmt_error(statement)};
+            mysql_stmt_close(statement);
             throw mse;
         }
     }
 }
 
 
-template <typename... Args>
-void OutputBinder<Args...>::refetchTruncatedColumns(
+void refetchTruncatedColumns(
+    MYSQL_STMT* const statement,
     std::vector<MYSQL_BIND>* const parameters,
     std::vector<std::vector<char>>* const buffers,
     std::vector<mysql_bind_length_t>* const lengths
@@ -291,13 +273,13 @@ void OutputBinder<Args...>::refetchTruncatedColumns(
         const size_t offset = std::get<1>(*i);
         MYSQL_BIND& parameter = parameters->at(column);
         const int status = mysql_stmt_fetch_column(
-            statement_,
+            statement,
             &parameter,
             column,
             offset);
         if (0 != status) {
-            MySqlException mse{mysql_stmt_error(statement_)};
-            mysql_stmt_close(statement_);
+            MySqlException mse{mysql_stmt_error(statement)};
+            mysql_stmt_close(statement);
             throw mse;
         }
 
@@ -308,9 +290,9 @@ void OutputBinder<Args...>::refetchTruncatedColumns(
     }
 
     // If we've changed the buffers, we need to rebind
-    if (0 != mysql_stmt_bind_result(statement_, &parameters->at(0))) {
-        MySqlException mse{mysql_stmt_error(statement_)};
-        mysql_stmt_close(statement_);
+    if (0 != mysql_stmt_bind_result(statement, &parameters->at(0))) {
+        MySqlException mse{mysql_stmt_error(statement)};
+        mysql_stmt_close(statement);
         throw mse;
     }
 }

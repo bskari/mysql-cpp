@@ -18,7 +18,10 @@
 #include "OutputBinder.hpp"
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 6)
+#ifndef nullptr
+// I know that this isn't a perfect substitution, but I'm lazy
 #define nullptr 0
+#endif
 #endif
 
 
@@ -133,8 +136,7 @@ my_ulonglong MySql::runCommand(
 
     std::vector<MYSQL_BIND> bindParameters;
     bindParameters.resize(parameterCount);
-    InputBinder<0, Args...> binder;
-    binder.bind(&bindParameters, args...);
+    bindInputs<Args...>(&bindParameters, args...);
     if (0 != mysql_stmt_bind_param(statement, &bindParameters[0])) {
         closeAndThrow(statement);
     }
@@ -215,14 +217,12 @@ void MySql::runQuery(
 
     std::vector<MYSQL_BIND> inputBindParameters;
     inputBindParameters.resize(parameterCount);
-    InputBinder<0, InputArgs...> inputBinder;
-    inputBinder.bind(&inputBindParameters, args...);
+    bindInputs<InputArgs...>(&inputBindParameters, args...);
     if (0 != mysql_stmt_bind_param(statement, &inputBindParameters[0])) {
         closeAndThrow(statement);
     }
 
-    OutputBinder<OutputArgs...> outputBinder{statement};
-    outputBinder.setResults(results);
+    setResults<OutputArgs...>(statement, results);
 
     // Cleanup
     if (0 != mysql_stmt_free_result(statement)) {
