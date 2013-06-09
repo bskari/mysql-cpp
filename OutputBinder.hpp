@@ -17,17 +17,12 @@
 #include "MySqlException.hpp"
 
 /**
- * Saves the results from the SQL query into the vector of tuples. This is the
- * only function in tis file that should be called from externally.
+ * Saves the results from the SQL query into the vector of tuples.
  */
 template <typename... Args>
 void setResults(
     MYSQL_STMT* const statement,
     std::vector<std::tuple<Args...>>* const results);
-
-
-static const char NULL_VALUE_ERROR_MESSAGE[] = \
-    "Null value encountered with non-shared_ptr output type";
 
 // The base type of the pointer MYSQL_BIND.length
 typedef typename std::remove_reference<decltype(*std::declval<
@@ -37,26 +32,40 @@ typedef typename std::remove_reference<decltype(*std::declval<
     )>::type
 >())>::type mysql_bind_length_t;
 
-static void refetchTruncatedColumns(
+namespace OutputBinderPrivate {
+
+/**
+ * Helper functions that aren't template dependent for setResults. Just trying
+ * to move as much of the compilable logic of this header out as I can.
+ */
+/// @{
+void throwIfArgumentCountWrong(size_t expectedSize, MYSQL_STMT* statement);
+int bindAndExecuteStatement(
+    std::vector<MYSQL_BIND>* parameters,
+    MYSQL_STMT* statement);
+void throwIfFetchError(int fetchStatus, MYSQL_STMT* statement);
+void refetchTruncatedColumns(
     MYSQL_STMT* const statement,
     std::vector<MYSQL_BIND>* const parameters,
     std::vector<std::vector<char>>* const buffers,
     std::vector<mysql_bind_length_t>* const lengths);
+/// @}
 
-namespace OutputBinderNamespace {
-    template<int I> struct int_ {};  // Compile-time counter
-}
+static const char NULL_VALUE_ERROR_MESSAGE[] = \
+    "Null value encountered with non-shared_ptr output type";
+
+template<int I> struct int_ {};  // Compile-time counter
 
 template<typename Tuple, int I>
-static void setResultTuple(
+void setResultTuple(
     Tuple* const tuple,
     const std::vector<MYSQL_BIND>& mysqlBindParameters,
-    typename OutputBinderNamespace::int_<I>);
+    int_<I>);
 template<typename Tuple>
-static void setResultTuple(
+void setResultTuple(
     Tuple* const tuple,
     const std::vector<MYSQL_BIND>& mysqlBindParameters,
-    typename OutputBinderNamespace::int_<-1>);
+    int_<-1>);
 // Keep this in a templated class instead of just defining function overloads
 // so that we don't get unused function warnings
 template <typename T>
@@ -84,20 +93,20 @@ class OutputBinderResultSetter<T*> {
 
 
 template<typename Tuple, int I>
-static void bindParameters(
+void bindParameters(
     const Tuple& tuple,  // We only need this so we can access the element types
     std::vector<MYSQL_BIND>* const mysqlBindParameters,
     std::vector<std::vector<char>>* const buffers,
     std::vector<my_bool> const nullFlags,
-    typename OutputBinderNamespace::int_<I>
+    int_<I>
 );
 template<typename Tuple>
-static void bindParameters(
+void bindParameters(
     const Tuple& tuple,  // We only need this so we can access the element types
     std::vector<MYSQL_BIND>* const,
     std::vector<std::vector<char>>* const,
     std::vector<my_bool> const,
-    typename OutputBinderNamespace::int_<-1>
+    int_<-1>
 );
 // Keep this in a templated class instead of just defining function overloads
 // so that we don't get unused function warnings
@@ -133,176 +142,11 @@ class OutputBinderParameterSetter<T*> {
 };
 
 
-template <typename... Args>
-void setResults(
-    MYSQL_STMT* const statement,
-    std::vector<std::tuple<Args...>>* const results
-) {
-    // Bind the output parameters
-    // Check that the sizes match
-    const size_t fieldCount = mysql_stmt_field_count(statement);
-    if (fieldCount != sizeof...(Args)) {
-        mysql_stmt_close(statement);
-        std::string errorMessage{
-            "Incorrect number of output parameters; query required "};
-        errorMessage += boost::lexical_cast<std::string>(fieldCount);
-        errorMessage += " but ";
-        errorMessage += boost::lexical_cast<std::string>(sizeof...(Args));
-        errorMessage += " parameters were provided";
-        throw MySqlException{errorMessage};
-    }
-
-    std::vector<MYSQL_BIND> parameters{};
-    parameters.resize(fieldCount);
-    std::vector<std::vector<char>> buffers;
-    buffers.resize(fieldCount);
-    std::vector<mysql_bind_length_t> lengths;
-    lengths.resize(fieldCount);
-    std::vector<my_bool> nullFlags;
-    nullFlags.resize(fieldCount);
-
-    // bindParameters needs to know the type of the tuples, and it does this by
-    // taking an example tuple, so just create a dummy
-    // TODO(bskari|2013-03-17) There has to be a better way than this
-    std::tuple<Args...> unused;
-    bindParameters(
-        unused,
-        &parameters,
-        &buffers,
-        &nullFlags,
-        OutputBinderNamespace::int_<sizeof...(Args) - 1>{});
-
-    for (size_t i = 0; i < buffers.size(); ++i) {
-        // This doesn't need to be set on every type, but it won't hurt
-        // anything, and it will make the OutputBinderParameterSetter
-        // specializations simpler
-        parameters.at(i).length = &lengths.at(i);
-    }
-    if (0 != mysql_stmt_bind_result(statement, &parameters.at(0))) {
-        MySqlException mse{mysql_stmt_error(statement)};
-        mysql_stmt_close(statement);
-        throw mse;
-    }
-
-    if (0 != mysql_stmt_execute(statement)) {
-        MySqlException mse{mysql_stmt_error(statement)};
-        mysql_stmt_close(statement);
-        throw mse;
-    }
-
-    int fetchStatus = mysql_stmt_fetch(statement);
-    while (0 == fetchStatus || MYSQL_DATA_TRUNCATED == fetchStatus) {
-        if (MYSQL_DATA_TRUNCATED == fetchStatus) {
-            refetchTruncatedColumns(statement, &parameters, &buffers, &lengths);
-        }
-
-        std::tuple<Args...> rowTuple;
-        try {
-            setResultTuple(
-                &rowTuple,
-                parameters,
-                OutputBinderNamespace::int_<sizeof...(Args) - 1>{});
-        } catch (...) {
-            mysql_stmt_close(statement);
-            throw;
-        }
-
-        results->push_back(rowTuple);
-        fetchStatus = mysql_stmt_fetch(statement);
-    }
-
-    switch (fetchStatus) {
-        case MYSQL_NO_DATA:
-            // No problem! All rows fetched.
-            break;
-        case 1: {  // Error occurred {
-            MySqlException mse{mysql_stmt_error(statement)};
-            mysql_stmt_close(statement);
-            throw mse;
-        }
-        default: {
-            assert(false && "Unknown error code from mysql_stmt_fetch");
-            MySqlException mse{mysql_stmt_error(statement)};
-            mysql_stmt_close(statement);
-            throw mse;
-        }
-    }
-}
-
-
-void refetchTruncatedColumns(
-    MYSQL_STMT* const statement,
-    std::vector<MYSQL_BIND>* const parameters,
-    std::vector<std::vector<char>>* const buffers,
-    std::vector<mysql_bind_length_t>* const lengths
-) {
-    // Find which buffers were too small, expand them and refetch
-    std::vector<std::tuple<size_t, size_t>> truncatedColumns;
-    for (size_t i = 0; i < lengths->size(); ++i) {
-        std::vector<char>& buffer = buffers->at(i);
-        const size_t untruncatedLength = lengths->at(i);
-        if (untruncatedLength > buffer.size()) {
-            // Only refetch the part that we didn't get the first time
-            const size_t alreadyRetrieved = buffer.size();
-            truncatedColumns.push_back(
-                std::tuple<size_t, size_t>(i, alreadyRetrieved));
-            buffer.resize(untruncatedLength + 1);
-            MYSQL_BIND& bind = parameters->at(i);
-            bind.buffer = &buffer.at(alreadyRetrieved);
-            bind.buffer_length = buffer.size() - alreadyRetrieved - 1;
-        }
-    }
-
-    // I'm not sure why, but I occasionally get the truncated status
-    // code when nothing was truncated... so just break out?
-    if (truncatedColumns.empty()) {
-        // No truncations!
-        return;
-    }
-
-    // Refetch only the data that were truncated
-    const std::vector<std::tuple<size_t, size_t>>::const_iterator end(
-        truncatedColumns.end());
-    for (
-        std::vector<std::tuple<size_t, size_t>>::const_iterator i(
-            truncatedColumns.begin());
-        i != end;
-        ++i
-    ) {
-        const size_t column = std::get<0>(*i);
-        const size_t offset = std::get<1>(*i);
-        MYSQL_BIND& parameter = parameters->at(column);
-        const int status = mysql_stmt_fetch_column(
-            statement,
-            &parameter,
-            column,
-            offset);
-        if (0 != status) {
-            MySqlException mse{mysql_stmt_error(statement)};
-            mysql_stmt_close(statement);
-            throw mse;
-        }
-
-        // Now, for subsequent fetches, we need to reset the buffers
-        std::vector<char>& buffer = buffers->at(column);
-        parameter.buffer = &buffer.at(0);
-        parameter.buffer_length = buffer.size();
-    }
-
-    // If we've changed the buffers, we need to rebind
-    if (0 != mysql_stmt_bind_result(statement, &parameters->at(0))) {
-        MySqlException mse{mysql_stmt_error(statement)};
-        mysql_stmt_close(statement);
-        throw mse;
-    }
-}
-
-
 template<typename Tuple, int I>
 void setResultTuple(
     Tuple* const tuple,
     const std::vector<MYSQL_BIND>& outputParameters,
-    typename OutputBinderNamespace::int_<I>
+    int_<I>
 ) {
     OutputBinderResultSetter<
         typename std::tuple_element<I, Tuple>::type
@@ -311,7 +155,7 @@ void setResultTuple(
     setResultTuple(
         tuple,
         outputParameters,
-        OutputBinderNamespace::int_<I - 1>{});
+        int_<I - 1>{});
 }
 
 
@@ -319,18 +163,29 @@ template<typename Tuple>
 void setResultTuple(
     Tuple* const,
     const std::vector<MYSQL_BIND>&,
-    typename OutputBinderNamespace::int_<-1>
+    int_<-1>
+) {
+}
+
+
+template<typename Tuple>
+void bindParameters(
+    const Tuple&,  // We only need this so we can access the element types
+    std::vector<MYSQL_BIND>* const,
+    std::vector<std::vector<char>>* const,
+    std::vector<my_bool>* const,
+    int_<-1>
 ) {
 }
 
 
 template<typename Tuple, int I>
-static void bindParameters(
+void bindParameters(
     const Tuple& tuple,  // We only need this so we can access the element types
     std::vector<MYSQL_BIND>* const mysqlBindParameters,
     std::vector<std::vector<char>>* const buffers,
     std::vector<my_bool>* const nullFlags,
-    typename OutputBinderNamespace::int_<I>
+    int_<I>
 ) {
     OutputBinderParameterSetter<
         typename std::tuple_element<I, Tuple>::type
@@ -344,18 +199,7 @@ static void bindParameters(
         mysqlBindParameters,
         buffers,
         nullFlags,
-        typename OutputBinderNamespace::int_<I - 1>());
-}
-
-
-template<typename Tuple>
-static void bindParameters(
-    const Tuple&,  // We only need this so we can access the element types
-    std::vector<MYSQL_BIND>* const,
-    std::vector<std::vector<char>>* const,
-    std::vector<my_bool>* const,
-    typename OutputBinderNamespace::int_<-1>
-) {
+        int_<I - 1>());
 }
 
 
@@ -465,7 +309,7 @@ void OutputBinderParameterSetter<T>::setParameter(
         // some truncated data, so don't mess with it.
         buffer->resize(20);
     }
-    bind->buffer = &(buffer->at(0));
+    bind->buffer = buffer->data();
     bind->is_null = isNullFlag;
     bind->buffer_length = buffer->size();
 }
@@ -512,7 +356,7 @@ struct OutputBinderParameterSetter<type> { \
         ) { \
             bind->buffer_type = mysqlType; \
             buffer->resize(sizeof(type)); \
-            bind->buffer = &(buffer->at(0)); \
+            bind->buffer = buffer->data(); \
             bind->is_null = isNullFlag; \
             bind->is_unsigned = isUnsigned; \
         } \
@@ -528,6 +372,71 @@ OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(int64_t,  MYSQL_TYPE_LONGLONG, 0)
 OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(uint64_t, MYSQL_TYPE_LONGLONG, 1)
 OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(float,    MYSQL_TYPE_FLOAT,    0)
 OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(double,   MYSQL_TYPE_DOUBLE,   0)
+
+}  // End anonymous namespace
+
+
+template <typename... Args>
+void setResults(
+    MYSQL_STMT* const statement,
+    std::vector<std::tuple<Args...>>* const results
+) {
+    OutputBinderPrivate::throwIfArgumentCountWrong(sizeof...(Args), statement);
+    const size_t fieldCount = mysql_stmt_field_count(statement);
+
+    std::vector<MYSQL_BIND> parameters(fieldCount);
+    std::vector<std::vector<char>> buffers(fieldCount);
+    std::vector<mysql_bind_length_t> lengths(fieldCount);
+    std::vector<my_bool> nullFlags(fieldCount);
+
+    // bindParameters needs to know the type of the tuples, and it does this by
+    // taking an example tuple, so just create a dummy
+    // TODO(bskari|2013-03-17) There has to be a better way than this
+    std::tuple<Args...> unused;
+    bindParameters(
+        unused,
+        &parameters,
+        &buffers,
+        &nullFlags,
+        OutputBinderPrivate::int_<sizeof...(Args) - 1>{});
+
+    for (size_t i = 0; i < fieldCount; ++i) {
+        // This doesn't need to be set on every type, but it won't hurt
+        // anything, and it will make the OutputBinderParameterSetter
+        // specializations simpler
+        parameters.at(i).length = &lengths.at(i);
+    }
+
+    int fetchStatus = OutputBinderPrivate::bindAndExecuteStatement(
+        &parameters,
+        statement);
+
+    while (0 == fetchStatus || MYSQL_DATA_TRUNCATED == fetchStatus) {
+        if (MYSQL_DATA_TRUNCATED == fetchStatus) {
+            OutputBinderPrivate::refetchTruncatedColumns(
+                statement,
+                &parameters,
+                &buffers,
+                &lengths);
+        }
+
+        std::tuple<Args...> rowTuple;
+        try {
+            setResultTuple(
+                &rowTuple,
+                parameters,
+                OutputBinderPrivate::int_<sizeof...(Args) - 1>{});
+        } catch (...) {
+            mysql_stmt_close(statement);
+            throw;
+        }
+
+        results->push_back(rowTuple);
+        fetchStatus = mysql_stmt_fetch(statement);
+    }
+
+    OutputBinderPrivate::throwIfFetchError(fetchStatus, statement);
+}
 
 
 #endif  // OUTPUTBINDER_HPP_

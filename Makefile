@@ -23,16 +23,21 @@ MySql.o: MySql.cpp MySql.hpp InputBinder.hpp OutputBinder.hpp \
 MySqlException.o: MySqlException.cpp MySqlException.hpp
 	$(CXX) $(CXXFLAGS) $(STATICFLAGS) MySqlException.cpp -o MySqlException.o
 
+OutputBinder.o: OutputBinder.hpp OutputBinder.cpp
+	$(CXX) $(CXXFLAGS) $(STATICFLAGS) OutputBinder.cpp -o OutputBinder.o
+
 libmysqlcpp.so: MySql.o MySql.hpp MySqlException.o MySqlException.hpp \
-	InputBinder.hpp OutputBinder.hpp
+	InputBinder.hpp OutputBinder.o OutputBinder.hpp
 	$(CXX) $(CXXFLAGS) $(SHAREDFLAGS) -W1,-soname,libmysqlcpp.so \
-		MySql.o MySqlException.o -o libmysqlcpp.so
+		MySql.o MySqlException.o OutputBinder.o -o libmysqlcpp.so
 
 test: tests/test.o tests/testInputBinder.o tests/testInputBinder.hpp \
 	tests/testOutputBinder.o tests/testOutputBinder.hpp \
-	tests/testMySql.hpp tests/testMySql.o MySqlException.o MySql.o
+	tests/testMySql.hpp tests/testMySql.o MySqlException.o MySql.o \
+	OutputBinder.o
 	$(CXX) $(CXXFLAGS) tests/test.o tests/testInputBinder.o \
 		tests/testOutputBinder.o tests/testMySql.o MySqlException.o MySql.o \
+		OutputBinder.o \
 		-lboost_unit_test_framework -lmysqlclient_r -o test
 
 tests/testInputBinder.o: tests/testInputBinder.cpp tests/testInputBinder.hpp \

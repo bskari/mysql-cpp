@@ -9,14 +9,14 @@
 #include <vector>
 
 /**
- * Binds the input parameters to the query. This is the only function that
- * should be called from externally.
+ * Binds the input parameters to the query.
  */
 template <typename... Args>
 void bindInputs(
     std::vector<MYSQL_BIND>* inputBindParameters,
     const Args&... args);
 
+namespace InputBinderPrivate {
 
 // C++11 doesn't allow for partial template specialization of variadic
 // templated functions, but it does of classes, so wrap this function in a
@@ -167,13 +167,15 @@ struct InputBinder<N, type, Tail...> { \
 INPUT_BINDER_FLOATING_TYPE_SPECIALIZATION(float, MYSQL_TYPE_FLOAT, 4)
 INPUT_BINDER_FLOATING_TYPE_SPECIALIZATION(double, MYSQL_TYPE_DOUBLE, 8)
 
+}  // End InputBinderPrivate namespace
+
 
 template <typename... Args>
 void bindInputs(
     std::vector<MYSQL_BIND>* const inputBindParameters,
     const Args&... args
 ) {
-    InputBinder<0, Args...> binder;
+    InputBinderPrivate::InputBinder<0, Args...> binder;
     binder.bind(inputBindParameters, args...);
 }
 

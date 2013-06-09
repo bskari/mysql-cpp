@@ -45,7 +45,7 @@ void testSetResult() {
     bind.buffer = &result; \
     bind.is_null = &nullFlag; \
     type output; \
-    OutputBinderResultSetter<type> setter; \
+    OutputBinderPrivate::OutputBinderResultSetter<type> setter; \
     setter.setResult(&output, bind); \
     BOOST_CHECK(result == output); \
     }
@@ -74,7 +74,7 @@ void testSetResult() {
         bind.buffer = &buffer.at(0);
         bind.is_null = &nullFlag;
         string output;
-        OutputBinderResultSetter<string> setter;
+        OutputBinderPrivate::OutputBinderResultSetter<string> setter;
         setter.setResult(&output, bind);
         BOOST_CHECK(result.size() == output.size());
         BOOST_CHECK(result == output);
@@ -89,7 +89,7 @@ void testSetResult() {
         nullFlag = true; \
         bind.buffer = &output; \
         bind.is_null = &nullFlag; \
-        OutputBinderResultSetter<decltype(result)> setter; \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(result)> setter; \
         setter.setResult(&result, bind); \
         BOOST_CHECK(0 == result.get()); \
     }
@@ -117,7 +117,7 @@ void testSetResult() {
         bind.buffer = &output; \
         nullFlag = false; \
         bind.is_null = &nullFlag; \
-        OutputBinderResultSetter<decltype(ptr)> setter; \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter; \
         setter.setResult(&ptr, bind); \
         BOOST_CHECK(nullptr != ptr.get()); \
         if (nullptr != ptr.get()) { \
@@ -149,7 +149,7 @@ void testSetResult() {
         bind.buffer = &buffer.at(0);
         nullFlag = false;
         bind.is_null = &nullFlag;
-        OutputBinderResultSetter<decltype(ptr)> setter;
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter;
         setter.setResult(&ptr, bind);
         BOOST_CHECK(nullptr != ptr.get());
         if (nullptr != ptr.get()) {
@@ -167,7 +167,7 @@ void testSetResult() {
         nullFlag = true; \
         bind.buffer = &output; \
         bind.is_null = &nullFlag; \
-        OutputBinderResultSetter<decltype(output)> setter; \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(output)> setter; \
         BOOST_CHECK_THROW(setter.setResult(&output, bind), MySqlException); \
     }
 #endif
@@ -197,7 +197,7 @@ void testSetParameter() {
 #define TYPE_TEST_SET_PARAMETER(type, mysqlType, isUnsigned) \
     { \
     vector<char> buffer; \
-    OutputBinderParameterSetter<type> setter; \
+    OutputBinderPrivate::OutputBinderParameterSetter<type> setter; \
     setter.setParameter(&bind, &buffer, &nullFlag); \
     BOOST_CHECK(sizeof(type) == buffer.size()); \
     BOOST_CHECK(bind.buffer == &buffer.at(0)); \
@@ -223,7 +223,7 @@ void testSetParameter() {
     {  // NOLINT[whitespace/parens]
         class UserType {};
         vector<char> buffer;
-        OutputBinderParameterSetter<UserType> setter;
+        OutputBinderPrivate::OutputBinderParameterSetter<UserType> setter;
         setter.setParameter(&bind, &buffer, &nullFlag);
         BOOST_CHECK(bind.buffer == &buffer.at(0));
         BOOST_CHECK(bind.is_null == &nullFlag);
@@ -234,7 +234,7 @@ void testSetParameter() {
 #define SHARED_PTR_TYPE_TEST_SET_PARAMETER(type, mysqlType, isUnsigned) \
     { \
     vector<char> buffer; \
-    OutputBinderParameterSetter<shared_ptr<type>> setter; \
+    OutputBinderPrivate::OutputBinderParameterSetter<shared_ptr<type>> setter; \
     setter.setParameter(&bind, &buffer, &nullFlag); \
     BOOST_CHECK(sizeof(type) == buffer.size()); \
     BOOST_CHECK(bind.buffer == &buffer.at(0)); \

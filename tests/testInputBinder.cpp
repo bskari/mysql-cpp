@@ -18,7 +18,7 @@ void testBind() {
     { \
         vector<MYSQL_BIND> binds; \
         binds.resize(1); \
-        InputBinder<0, type> binder; \
+        InputBinderPrivate::InputBinder<0, type> binder; \
         type t = 0; \
         binder.bind(&binds, t); \
         BOOST_CHECK(mysqlType == binds.at(0).buffer_type); \
@@ -42,7 +42,7 @@ void testBind() {
     {
         vector<MYSQL_BIND> binds;
         binds.resize(1);
-        InputBinder<0, float> binder;
+        InputBinderPrivate::InputBinder<0, float> binder;
         float t = 0.0;
         binder.bind(&binds, t);
         BOOST_CHECK(MYSQL_TYPE_FLOAT == binds.at(0).buffer_type);
@@ -55,7 +55,7 @@ void testBind() {
     {
         vector<MYSQL_BIND> binds;
         binds.resize(1);
-        InputBinder<0, double> binder;
+        InputBinderPrivate::InputBinder<0, double> binder;
         double t = 0;
         binder.bind(&binds, t);
         BOOST_CHECK(MYSQL_TYPE_DOUBLE == binds.at(0).buffer_type);
@@ -68,7 +68,7 @@ void testBind() {
     {
         vector<MYSQL_BIND> binds;
         binds.resize(1);
-        InputBinder<0, char*> binder;
+        InputBinderPrivate::InputBinder<0, char*> binder;
         char t[50];
         strncpy(t, "Hello world", sizeof(t) / sizeof(t[0]));
         binder.bind(&binds, t);
@@ -81,7 +81,7 @@ void testBind() {
     {
         vector<MYSQL_BIND> binds;
         binds.resize(1);
-        InputBinder<0, const char*> binder;
+        InputBinderPrivate::InputBinder<0, const char*> binder;
         const char t[50] = "Hello world";
         binder.bind(&binds, t);
         BOOST_CHECK(MYSQL_TYPE_STRING == binds.at(0).buffer_type);
@@ -93,7 +93,7 @@ void testBind() {
     {
         vector<MYSQL_BIND> binds;
         binds.resize(1);
-        InputBinder<0, string> binder;
+        InputBinderPrivate::InputBinder<0, string> binder;
         string t("Hello world");
         binder.bind(&binds, t);
         BOOST_CHECK(MYSQL_TYPE_STRING == binds.at(0).buffer_type);
