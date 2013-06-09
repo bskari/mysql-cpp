@@ -1,3 +1,6 @@
+#include "MySql.hpp"
+#include "MySqlException.hpp"
+
 #include <cassert>
 
 #include <iostream>
@@ -6,11 +9,7 @@
 #include <tuple>
 #include <vector>
 
-#include "MySql.hpp"
-#include "MySqlException.hpp"
-
 using std::basic_ostream;
-using std::shared_ptr;
 using std::cin;
 using std::cout;
 using std::endl;
@@ -18,6 +17,7 @@ using std::get;
 using std::ostream;
 using std::string;
 using std::tuple;
+using std::unique_ptr;
 using std::vector;
 
 
@@ -33,7 +33,7 @@ template <typename Char, typename Traits, typename... Args>
 ostream& operator<<(basic_ostream<Char, Traits>& out, tuple<Args...> const& t);
 
 template <typename T>
-ostream& operator<<(ostream& out, const shared_ptr<T>& ptr);
+ostream& operator<<(ostream& out, const unique_ptr<T>& ptr);
 
 
 int main(int argc, char* argv[]) {
@@ -121,12 +121,12 @@ int main(int argc, char* argv[]) {
         cout << e.what() << endl;
     }
 
-    // But, we can select into tuples with shared_ptr
+    // But, we can select into tuples with unique_ptr
     typedef tuple<
-        shared_ptr<int>,
-        shared_ptr<string>,
-        shared_ptr<string>,
-        shared_ptr<int>
+        unique_ptr<int>,
+        unique_ptr<string>,
+        unique_ptr<string>,
+        unique_ptr<int>
     > autoPtrUserTuple;
     vector<autoPtrUserTuple> autoPtrUsers;
     conn.runQuery(&autoPtrUsers, "SELECT * FROM user");
@@ -181,7 +181,7 @@ ostream& operator<<(
 }
 
 template <typename T>
-ostream& operator<<(ostream& out, const shared_ptr<T>& ptr) {
+ostream& operator<<(ostream& out, const unique_ptr<T>& ptr) {
     if (nullptr != ptr.get()) {
         out << *ptr;
     } else {

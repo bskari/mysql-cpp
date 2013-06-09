@@ -1,9 +1,7 @@
 #ifndef OUTPUTBINDER_HPP_
 #define OUTPUTBINDER_HPP_
 
-#include <cassert>
 #include <cstdint>
-#include <cstring>
 #include <mysql/mysql.h>
 
 #include <boost/lexical_cast.hpp>
@@ -52,7 +50,7 @@ void refetchTruncatedColumns(
 /// @}
 
 static const char NULL_VALUE_ERROR_MESSAGE[] = \
-    "Null value encountered with non-shared_ptr output type";
+    "Null value encountered with non-smart-pointer output type";
 
 template<int I> struct int_ {};  // Compile-time counter
 
@@ -83,6 +81,13 @@ class OutputBinderResultSetter<std::shared_ptr<T>> {
     public:
         static void setResult(
             std::shared_ptr<T>* const value,
+            const MYSQL_BIND& bind);
+};
+template<typename T>
+class OutputBinderResultSetter<std::unique_ptr<T>> {
+    public:
+        static void setResult(
+            std::unique_ptr<T>* const value,
             const MYSQL_BIND& bind);
 };
 template<typename T>
@@ -126,6 +131,14 @@ class OutputBinderParameterSetter {
 };
 template<typename T>
 class OutputBinderParameterSetter<std::shared_ptr<T>> {
+    public:
+        static void setParameter(
+            MYSQL_BIND* const bind,
+            std::vector<char>* const buffer,
+            my_bool* const isNullFlag);
+};
+template<typename T>
+class OutputBinderParameterSetter<std::unique_ptr<T>> {
     public:
         static void setParameter(
             MYSQL_BIND* const bind,
@@ -216,9 +229,9 @@ void OutputBinderResultSetter<T>::setResult(
     }
     *value = boost::lexical_cast<T>(static_cast<char*>(bind.buffer));
 }
-// **********************************************************
-// Partial specialization for shared_ptr types for setResult
-// **********************************************************
+// ************************************************************
+// Partial specialization for smart pointer types for setResult
+// ************************************************************
 template<typename T>
 void OutputBinderResultSetter<std::shared_ptr<T>>::setResult(
     std::shared_ptr<T>* const value,
@@ -229,14 +242,32 @@ void OutputBinderResultSetter<std::shared_ptr<T>>::setResult(
         value->reset();
     } else {
         // Fall through to the non-shared_ptr version
-        // TODO(bskari|2013-03-13) We shouldn't need to allocate a new object,
-        // send it to a non-shared_ptr instance of setResult, and then make a
-        // copy of it. Refactor this delegation stuff out so that falling
-        // through is cleaner.
-        T newObject;
+        // TODO(bskari|2013-06-08) It would be cool if we could call a
+        // constructor direcly instead of allocating the object and then using
+        // the assignment operator
+        T* newObject = new T;
         OutputBinderResultSetter<T> setter;
-        setter.setResult(&newObject, bind);
-        *value = std::make_shared<T>(newObject);
+        setter.setResult(newObject, bind);
+        *value = std::shared_ptr<T>(newObject);
+    }
+}
+template<typename T>
+void OutputBinderResultSetter<std::unique_ptr<T>>::setResult(
+    std::unique_ptr<T>* const value,
+    const MYSQL_BIND& bind
+) {
+    if (*bind.is_null) {
+        // Remove object (if any)
+        value->reset();
+    } else {
+        // Fall through to the non-unique_ptr version
+        // TODO(bskari|2013-06-08) It would be cool if we could call a
+        // constructor direcly instead of allocating the object and then using
+        // the assignment operator
+        T* newObject = new T;
+        OutputBinderResultSetter<T> setter;
+        setter.setResult(newObject, bind);
+        *value = std::unique_ptr<T>(newObject);
     }
 }
 // *******************************************************
@@ -248,7 +279,8 @@ void OutputBinderResultSetter<T*>::setResult(T** const, const MYSQL_BIND&) {
         // C++ guarantees that the sizeof any type >= 0, so this will always
         // give a compile time error
         sizeof(T) < 0,
-        "Raw pointers are not supported; use std::shared_ptr instead");
+        "Raw pointers are not supported; use std::shared_ptr or"
+            " std::unique_ptr instead");
 }
 // ***********************************
 // Full specializations for setResult
@@ -326,6 +358,16 @@ void OutputBinderParameterSetter<std::shared_ptr<T>>::setParameter(
     OutputBinderParameterSetter<T> setter;
     setter.setParameter(bind, buffer, isNullFlag);
 }
+template<typename T>
+void OutputBinderParameterSetter<std::unique_ptr<T>>::setParameter(
+    MYSQL_BIND* const bind,
+    std::vector<char>* const buffer,
+    my_bool* const isNullFlag
+) {
+    // Just forward to the full specialization
+    OutputBinderParameterSetter<T> setter;
+    setter.setParameter(bind, buffer, isNullFlag);
+}
 // *********************************************************
 // Partial specialization for pointer types for setParameter
 // *********************************************************
@@ -339,7 +381,8 @@ void OutputBinderParameterSetter<T*>::setParameter(
         // C++ guarantees that the sizeof any type >= 0, so this will always
         // give a compile time error
         sizeof(T) < 0,
-        "Raw pointers are not suppoorted; use std::shared_ptr instead");
+        "Raw pointers are not supported; use std::shared_ptr or"
+            " std::unique_ptr instead");
 }
 // *************************************
 // Full specializations for setParameter
@@ -431,7 +474,7 @@ void setResults(
             throw;
         }
 
-        results->push_back(rowTuple);
+        results->push_back(std::move(rowTuple));
         fetchStatus = mysql_stmt_fetch(statement);
     }
 

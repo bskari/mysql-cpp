@@ -15,6 +15,7 @@
 using std::shared_ptr;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using std::vector;
 
 /**
@@ -156,7 +157,7 @@ void testSetResult() {
             BOOST_CHECK(result.size() == ptr->size());
             BOOST_CHECK(result == *ptr);
         }
-        }
+    }
 
     // Trying to set a NULL value with a non-std::shared_ptr parameter should
     // throw
@@ -184,6 +185,111 @@ void testSetResult() {
     NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(int64_t)
     NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(uint64_t)
     NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(string)
+
+    // std::unique_ptr with NULL test
+#ifndef NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT
+#define NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(type) \
+    { \
+        type output = weakLexicalCast<type>(rand_r(&randSeed)); \
+        unique_ptr<type> result; \
+        nullFlag = true; \
+        bind.buffer = &output; \
+        bind.is_null = &nullFlag; \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(result)> setter; \
+        setter.setResult(&result, bind); \
+        BOOST_CHECK(0 == result.get()); \
+    }
+#endif
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(char)   // NOLINT[readability/casting]
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int8_t)
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint8_t)
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int16_t)
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint16_t)
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int32_t)
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint32_t)
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int64_t)
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint64_t)
+    NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(string)
+
+    // std::unique_ptr with a value test
+#ifndef UNIQUE_PTR_TYPE_TEST_SET_RESULT
+#define UNIQUE_PTR_TYPE_TEST_SET_RESULT(type) \
+    { \
+        type output = weakLexicalCast<type>(rand_r(&randSeed)); \
+        unique_ptr<decltype(output)> ptr; \
+        bind.buffer = &output; \
+        nullFlag = false; \
+        bind.is_null = &nullFlag; \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter; \
+        setter.setResult(&ptr, bind); \
+        BOOST_CHECK(nullptr != ptr.get()); \
+        if (nullptr != ptr.get()) { \
+            BOOST_CHECK(output == *ptr); \
+        } \
+    }
+#endif
+    UNIQUE_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+    UNIQUE_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
+    UNIQUE_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+    UNIQUE_PTR_TYPE_TEST_SET_RESULT(int8_t)
+    UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint8_t)
+    UNIQUE_PTR_TYPE_TEST_SET_RESULT(int16_t)
+    UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint16_t)
+    UNIQUE_PTR_TYPE_TEST_SET_RESULT(int32_t)
+    UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint32_t)
+    UNIQUE_PTR_TYPE_TEST_SET_RESULT(int64_t)
+    UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint64_t)
+    {  // NOLINT[whitespace/parens]
+        string result(" ", 5);
+        unique_ptr<decltype(result)> ptr;
+        vector<char> buffer(result.size());
+        for (size_t i = 0; i < result.size(); ++i) {
+            // Let's avoid \0
+            buffer.at(i) = result.at(i) = static_cast<char>(
+                (rand_r(&randSeed) % 10 + 'a'));
+        }
+        buffer.push_back('\0');
+        bind.buffer = &buffer.at(0);
+        nullFlag = false;
+        bind.is_null = &nullFlag;
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter;
+        setter.setResult(&ptr, bind);
+        BOOST_CHECK(nullptr != ptr.get());
+        if (nullptr != ptr.get()) {
+            BOOST_CHECK(result.size() == ptr->size());
+            BOOST_CHECK(result == *ptr);
+        }
+    }
+
+    // Trying to set a NULL value with a non-std::unique_ptr parameter should
+    // throw
+#ifndef NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT
+#define NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(type) \
+    { \
+        type output = weakLexicalCast<type>(rand_r(&randSeed)); \
+        nullFlag = true; \
+        bind.buffer = &output; \
+        bind.is_null = &nullFlag; \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(output)> setter; \
+        BOOST_CHECK_THROW(setter.setResult(&output, bind), MySqlException); \
+    }
+#endif
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(char)   // NOLINT[readability/casting]
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int8_t)
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint8_t)
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int16_t)
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint16_t)
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int32_t)
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint32_t)
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int64_t)
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint64_t)
+    NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(string)
 }
 
 

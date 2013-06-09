@@ -60,7 +60,7 @@ struct InputBinder<N, char*, Tail...> {
         bindParameter.buffer_type = MYSQL_TYPE_STRING;
         bindParameter.buffer = const_cast<void*>(
             static_cast<const void*>(value));
-        bindParameter.buffer_length = strlen(value);
+        bindParameter.buffer_length = std::strlen(value);
         bindParameter.length = &bindParameter.buffer_length;
         bindParameter.is_unsigned = 0;
         bindParameter.is_null = 0;
@@ -167,7 +167,7 @@ struct InputBinder<N, type, Tail...> { \
 INPUT_BINDER_FLOATING_TYPE_SPECIALIZATION(float, MYSQL_TYPE_FLOAT, 4)
 INPUT_BINDER_FLOATING_TYPE_SPECIALIZATION(double, MYSQL_TYPE_DOUBLE, 8)
 
-}  // End InputBinderPrivate namespace
+}  // namespace InputBinderPrivate
 
 
 template <typename... Args>

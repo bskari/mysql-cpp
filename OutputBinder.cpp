@@ -1,12 +1,13 @@
+#include "MySqlException.hpp"
+#include "OutputBinder.hpp"
+
+#include <cassert>
 #include <mysql/mysql.h>
 
 #include <boost/lexical_cast.hpp>
 #include <string>
 #include <tuple>
 #include <vector>
-
-#include "MySqlException.hpp"
-#include "OutputBinder.hpp"
 
 using boost::lexical_cast;
 using std::get;
@@ -141,4 +142,4 @@ void refetchTruncatedColumns(
     }
 }
 
-}  // end OutputBinderPrivate
+}  // namespace OutputBinderPrivate
