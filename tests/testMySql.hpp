@@ -11,14 +11,8 @@
  */
 void testConnection();
 
-/**
- * Tests the runCommand function.
- */
 void testRunCommand();
 
-/**
- * Tests the runQuery function.
- */
 void testRunQuery();
 
 /**
@@ -27,5 +21,7 @@ void testRunQuery();
  * run, e.g. "DANCE FOR ME"
  */
 void testInvalidCommands();
+
+void testPreparedStatement();
 
 #endif  // TESTS_TESTMYSQL_HPP_

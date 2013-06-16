@@ -37,7 +37,8 @@ test::test_suite* init_unit_test_suite(int, char*[]) {
         FD(testConnection),
         FD(testRunCommand),
         FD(testRunQuery),
-        FD(testInvalidCommands)
+        FD(testInvalidCommands),
+        FD(testPreparedStatement)
     };
 
     for (size_t i = 0; i < sizeof(functions) / sizeof(functions[0]); ++i) {

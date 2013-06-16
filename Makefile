@@ -17,27 +17,32 @@ examples.o: examples.cpp MySql.hpp MySqlException.hpp InputBinder.hpp \
 	OutputBinder.hpp
 
 MySql.o: MySql.cpp MySql.hpp InputBinder.hpp OutputBinder.hpp \
-	MySqlException.o MySqlException.hpp
+	MySqlException.o MySqlException.hpp MySqlPreparedStatement.hpp
 	$(CXX) $(CXXFLAGS) $(STATICFLAGS) MySql.cpp -o MySql.o
 
 MySqlException.o: MySqlException.cpp MySqlException.hpp
 	$(CXX) $(CXXFLAGS) $(STATICFLAGS) MySqlException.cpp -o MySqlException.o
 
-OutputBinder.o: OutputBinder.hpp OutputBinder.cpp
+MySqlPreparedStatement.o: MySqlPreparedStatement.cpp MySqlPreparedStatement.hpp
+	$(CXX) $(CXXFLAGS) $(STATICFLAGS) MySqlPreparedStatement.cpp \
+		-o MySqlPreparedStatement.o
+
+OutputBinder.o: OutputBinder.hpp OutputBinder.cpp MySqlPreparedStatement.hpp
 	$(CXX) $(CXXFLAGS) $(STATICFLAGS) OutputBinder.cpp -o OutputBinder.o
 
 libmysqlcpp.so: MySql.o MySql.hpp MySqlException.o MySqlException.hpp \
-	InputBinder.hpp OutputBinder.o OutputBinder.hpp
+	MySqlPreparedStatement.o InputBinder.hpp OutputBinder.o OutputBinder.hpp
 	$(CXX) $(CXXFLAGS) $(SHAREDFLAGS) -W1,-soname,libmysqlcpp.so \
-		MySql.o MySqlException.o OutputBinder.o -o libmysqlcpp.so
+		MySql.o MySqlException.o MySqlPreparedStatement.o OutputBinder.o \
+		-o libmysqlcpp.so
 
 test: tests/test.o tests/testInputBinder.o tests/testInputBinder.hpp \
 	tests/testOutputBinder.o tests/testOutputBinder.hpp \
 	tests/testMySql.hpp tests/testMySql.o MySqlException.o MySql.o \
-	OutputBinder.o
+	MySqlPreparedStatement.o OutputBinder.o
 	$(CXX) $(CXXFLAGS) tests/test.o tests/testInputBinder.o \
 		tests/testOutputBinder.o tests/testMySql.o MySqlException.o MySql.o \
-		OutputBinder.o \
+		MySqlPreparedStatement.o OutputBinder.o \
 		-lboost_unit_test_framework -lmysqlclient_r -o test
 
 tests/testInputBinder.o: tests/testInputBinder.cpp tests/testInputBinder.hpp \
@@ -46,7 +51,8 @@ tests/testInputBinder.o: tests/testInputBinder.cpp tests/testInputBinder.hpp \
 tests/testOutputBinder.o: tests/testOutputBinder.cpp \
 	tests/testOutputBinder.hpp OutputBinder.hpp
 
-tests/testMySql.o: tests/testMySql.cpp tests/testMySql.hpp MySql.hpp
+tests/testMySql.o: tests/testMySql.cpp tests/testMySql.hpp MySql.hpp \
+	MySqlPreparedStatement.hpp
 
 .PHONY: clean
 clean: clean-coverage
@@ -62,6 +68,6 @@ clean-coverage:
 	rm -rf coverage
 
 .PHONY: coverage
-coverage: clean-coverage
+coverage:
 	lcov --capture --directory . --base-directory . --output-file coverage.info
 	genhtml coverage.info --output-directory coverage

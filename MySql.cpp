@@ -80,3 +80,8 @@ my_ulonglong MySql::runCommand(const char* const command) {
 
     return affectedRows;
 }
+
+
+MySqlPreparedStatement MySql::prepareStatement(const char* const command) const {
+    return MySqlPreparedStatement(command, connection_);
+}

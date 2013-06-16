@@ -6,11 +6,13 @@
 #include <exception>
 #include <string>
 
+class MySqlPreparedStatement;
+
 class MySqlException : public std::exception {
     public:
         explicit MySqlException(const std::string& message);
         explicit MySqlException(const MYSQL* const connection);
-        explicit MySqlException(const MYSQL_STMT* const statement);
+        explicit MySqlException(const MySqlPreparedStatement& statement);
         ~MySqlException() noexcept;
 
         MySqlException& operator=(const MySqlException&) = delete;

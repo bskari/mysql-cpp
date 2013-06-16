@@ -1,4 +1,5 @@
 #include "MySqlException.hpp"
+#include "MySqlPreparedStatement.hpp"
 
 #include <mysql/mysql.h>
 #include <string>
@@ -17,8 +18,8 @@ MySqlException::MySqlException(const MYSQL* const connection)
 }
 
 
-MySqlException::MySqlException(const MYSQL_STMT* const statement)
-    : message_{getServerErrorMessage(statement)}
+MySqlException::MySqlException(const MySqlPreparedStatement& statement)
+    : message_{getServerErrorMessage(statement.statementHandle_)}
 {
 }
 

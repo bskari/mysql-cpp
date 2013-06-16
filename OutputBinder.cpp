@@ -1,4 +1,5 @@
 #include "MySqlException.hpp"
+#include "MySqlPreparedStatement.hpp"
 #include "OutputBinder.hpp"
 
 #include <cassert>
@@ -17,17 +18,15 @@ using std::vector;
 
 namespace OutputBinderPrivate {
 
-void throwIfArgumentCountWrong(
+void Friend::throwIfParameterCountWrong(
     const size_t numRequiredParameters,
-    MYSQL_STMT* const statement
+    const MySqlPreparedStatement& statement
 ) {
     // Check that the sizes match
-    const size_t fieldCount = mysql_stmt_field_count(statement);
-    if (fieldCount != numRequiredParameters) {
-        mysql_stmt_close(statement);
+    if (statement.getFieldCount() != numRequiredParameters) {
         string errorMessage{
             "Incorrect number of output parameters; query required "};
-        errorMessage += lexical_cast<string>(fieldCount);
+        errorMessage += lexical_cast<string>(statement.getFieldCount());
         errorMessage += " but ";
         errorMessage += lexical_cast<string>(numRequiredParameters);
         errorMessage += " parameters were provided";
@@ -36,47 +35,45 @@ void throwIfArgumentCountWrong(
 }
 
 
-int bindAndExecuteStatement(
+int Friend::bindAndExecuteStatement(
     vector<MYSQL_BIND>* const parameters,
-    MYSQL_STMT* const statement
+    const MySqlPreparedStatement& statement
 ) {
-    if (0 != mysql_stmt_bind_result(statement, parameters->data())) {
-        MySqlException mse{mysql_stmt_error(statement)};
-        mysql_stmt_close(statement);
-        throw mse;
+    if (0 != mysql_stmt_bind_result(
+        statement.statementHandle_,
+        parameters->data()))
+    {
+        throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
     }
 
-    if (0 != mysql_stmt_execute(statement)) {
-        MySqlException mse{mysql_stmt_error(statement)};
-        mysql_stmt_close(statement);
-        throw mse;
+    if (0 != mysql_stmt_execute(statement.statementHandle_)) {
+        throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
     }
     
-    return mysql_stmt_fetch(statement);
+    return mysql_stmt_fetch(statement.statementHandle_);
 }
 
-void throwIfFetchError(const int fetchStatus, MYSQL_STMT* const statement) {
+void Friend::throwIfFetchError(
+    const int fetchStatus,
+    const MySqlPreparedStatement& statement
+) {
     switch (fetchStatus) {
         case MYSQL_NO_DATA:
             // No problem! All rows fetched.
             break;
         case 1: {  // Error occurred {
-            MySqlException mse{mysql_stmt_error(statement)};
-            mysql_stmt_close(statement);
-            throw mse;
+            throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
         }
         default: {
             assert(false && "Unknown error code from mysql_stmt_fetch");
-            MySqlException mse{mysql_stmt_error(statement)};
-            mysql_stmt_close(statement);
-            throw mse;
+            throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
         }
     }
 }
 
 
-void refetchTruncatedColumns(
-    MYSQL_STMT* const statement,
+void Friend::refetchTruncatedColumns(
+    const MySqlPreparedStatement& statement,
     vector<MYSQL_BIND>* const parameters,
     vector<vector<char>>* const buffers,
     vector<mysql_bind_length_t>* const lengths
@@ -118,14 +115,12 @@ void refetchTruncatedColumns(
         const size_t offset = get<1>(*i);
         MYSQL_BIND& parameter = parameters->at(column);
         const int status = mysql_stmt_fetch_column(
-            statement,
+            statement.statementHandle_,
             &parameter,
             column,
             offset);
         if (0 != status) {
-            MySqlException mse{mysql_stmt_error(statement)};
-            mysql_stmt_close(statement);
-            throw mse;
+            throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
         }
 
         // Now, for subsequent fetches, we need to reset the buffers
@@ -135,11 +130,17 @@ void refetchTruncatedColumns(
     }
 
     // If we've changed the buffers, we need to rebind
-    if (0 != mysql_stmt_bind_result(statement, parameters->data())) {
-        MySqlException mse{mysql_stmt_error(statement)};
-        mysql_stmt_close(statement);
-        throw mse;
+    if (0 != mysql_stmt_bind_result(
+        statement.statementHandle_,
+        parameters->data()))
+    {
+        throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
     }
+}
+
+
+int Friend::fetch(const MySqlPreparedStatement& statement) {
+    return mysql_stmt_fetch(statement.statementHandle_);
 }
 
 }  // namespace OutputBinderPrivate

@@ -13,9 +13,9 @@ from MySQL.
     vector<tuple<string, int>> users;
     connection.runQuery(&users, "SELECT name, age FROM user");
 
-`mysql-cpp` accomodates `NULL` values by sending tuples with
-`std::shared_ptr`. If a `NULL` is encountered with a non-`std::shared_ptr`
-data type, an exception is thrown.
+`mysql-cpp` accomodates `NULL` values by sending tuples with `std::shared_ptr`
+or `std::unique_ptr`. If a `NULL` is encountered with a non-`std::shared_ptr`
+or non-`std::unique_ptr` data type, an exception is thrown.
 
     vector<tuple<string, shared_ptr<string>>> movies;
     connection.runQuery(&movies, "SELECT user, favorite_movie FROM user");

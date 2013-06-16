@@ -13,13 +13,14 @@
 #include <vector>
 
 #include "MySqlException.hpp"
+#include "MySqlPreparedStatement.hpp"
 
 /**
  * Saves the results from the SQL query into the vector of tuples.
  */
 template <typename... Args>
 void setResults(
-    MYSQL_STMT* const statement,
+    const MySqlPreparedStatement& statement,
     std::vector<std::tuple<Args...>>* const results);
 
 // The base type of the pointer MYSQL_BIND.length
@@ -34,19 +35,36 @@ namespace OutputBinderPrivate {
 
 /**
  * Helper functions that aren't template dependent for setResults. Just trying
- * to move as much of the compilable logic of this header out as I can.
+ * to move as much of the compilable logic of this header out as I can. I wrap
+ * these in a class so I can declare them as a friend class of
+ * MySqlPreparedStatement.
  */
 /// @{
-void throwIfArgumentCountWrong(size_t expectedSize, MYSQL_STMT* statement);
-int bindAndExecuteStatement(
-    std::vector<MYSQL_BIND>* parameters,
-    MYSQL_STMT* statement);
-void throwIfFetchError(int fetchStatus, MYSQL_STMT* statement);
-void refetchTruncatedColumns(
-    MYSQL_STMT* const statement,
-    std::vector<MYSQL_BIND>* const parameters,
-    std::vector<std::vector<char>>* const buffers,
-    std::vector<mysql_bind_length_t>* const lengths);
+class Friend {
+    public:
+        static void throwIfParameterCountWrong(
+            size_t expectedSize,
+            const MySqlPreparedStatement& statement);
+        static int bindAndExecuteStatement(
+            std::vector<MYSQL_BIND>* parameters,
+            const MySqlPreparedStatement& statement);
+        static void throwIfFetchError(
+            int fetchStatus,
+            const MySqlPreparedStatement& statement);
+        static void refetchTruncatedColumns(
+            const MySqlPreparedStatement& statement,
+            std::vector<MYSQL_BIND>* const parameters,
+            std::vector<std::vector<char>>* const buffers,
+            std::vector<mysql_bind_length_t>* const lengths);
+        static int fetch(const MySqlPreparedStatement& statement);
+
+    private:
+        Friend() = delete;
+        Friend(const Friend&) = delete;
+        Friend(Friend&&) = delete;
+        Friend& operator=(const Friend&) = delete;
+        Friend& operator=(Friend&&) = delete;
+};
 /// @}
 
 static const char NULL_VALUE_ERROR_MESSAGE[] = \
@@ -421,16 +439,17 @@ OUTPUT_BINDER_PARAMETER_SETTER_SPECIALIZATION(double,   MYSQL_TYPE_DOUBLE,   0)
 
 template <typename... Args>
 void setResults(
-    MYSQL_STMT* const statement,
+    const MySqlPreparedStatement& statement,
     std::vector<std::tuple<Args...>>* const results
 ) {
-    OutputBinderPrivate::throwIfArgumentCountWrong(sizeof...(Args), statement);
-    const size_t fieldCount = mysql_stmt_field_count(statement);
-
-    std::vector<MYSQL_BIND> parameters(fieldCount);
-    std::vector<std::vector<char>> buffers(fieldCount);
-    std::vector<mysql_bind_length_t> lengths(fieldCount);
-    std::vector<my_bool> nullFlags(fieldCount);
+    OutputBinderPrivate::Friend::throwIfParameterCountWrong(
+        sizeof...(Args),
+        statement
+    );
+    std::vector<MYSQL_BIND> parameters(statement.getFieldCount());
+    std::vector<std::vector<char>> buffers(statement.getFieldCount());
+    std::vector<mysql_bind_length_t> lengths(statement.getFieldCount());
+    std::vector<my_bool> nullFlags(statement.getFieldCount());
 
     // bindParameters needs to know the type of the tuples, and it does this by
     // taking an example tuple, so just create a dummy
@@ -443,20 +462,20 @@ void setResults(
         &nullFlags,
         OutputBinderPrivate::int_<sizeof...(Args) - 1>{});
 
-    for (size_t i = 0; i < fieldCount; ++i) {
+    for (size_t i = 0; i < statement.getFieldCount(); ++i) {
         // This doesn't need to be set on every type, but it won't hurt
         // anything, and it will make the OutputBinderParameterSetter
         // specializations simpler
         parameters.at(i).length = &lengths.at(i);
     }
 
-    int fetchStatus = OutputBinderPrivate::bindAndExecuteStatement(
+    int fetchStatus = OutputBinderPrivate::Friend::bindAndExecuteStatement(
         &parameters,
         statement);
 
     while (0 == fetchStatus || MYSQL_DATA_TRUNCATED == fetchStatus) {
         if (MYSQL_DATA_TRUNCATED == fetchStatus) {
-            OutputBinderPrivate::refetchTruncatedColumns(
+            OutputBinderPrivate::Friend::refetchTruncatedColumns(
                 statement,
                 &parameters,
                 &buffers,
@@ -464,21 +483,16 @@ void setResults(
         }
 
         std::tuple<Args...> rowTuple;
-        try {
-            setResultTuple(
-                &rowTuple,
-                parameters,
-                OutputBinderPrivate::int_<sizeof...(Args) - 1>{});
-        } catch (...) {
-            mysql_stmt_close(statement);
-            throw;
-        }
+        setResultTuple(
+            &rowTuple,
+            parameters,
+            OutputBinderPrivate::int_<sizeof...(Args) - 1>{});
 
         results->push_back(std::move(rowTuple));
-        fetchStatus = mysql_stmt_fetch(statement);
+        fetchStatus = OutputBinderPrivate::Friend::fetch(statement);
     }
 
-    OutputBinderPrivate::throwIfFetchError(fetchStatus, statement);
+    OutputBinderPrivate::Friend::throwIfFetchError(fetchStatus, statement);
 }
 
 
