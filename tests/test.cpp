@@ -41,13 +41,13 @@ test::test_suite* init_unit_test_suite(int, char*[]) {
         FD(testPreparedStatement)
     };
 
-    for (size_t i = 0; i < sizeof(functions) / sizeof(functions[0]); ++i) {
+    for (const auto& functionDescription : functions) {
         test::framework::master_test_suite().add(
             test::make_test_case(
-                test::callback0<>(functions[i].function_),
+                test::callback0<>(functionDescription.function_),
                 test::literal_string(
-                    functions[i].name_.c_str(),
-                    functions[i].name_.length())));
+                    functionDescription.name_.c_str(),
+                    functionDescription.name_.length())));
     }
 
     return 0;

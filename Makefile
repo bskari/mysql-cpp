@@ -4,7 +4,11 @@ CXX=g++
 # For example, GCC 4.4.6 only recognizes -std=c++0x, so I changed CXX_STANDARD
 # to that in my Makefile.custom.
 -include Makefile.custom
-CXXFLAGS=-std=$(CXX_STANDARD) --pedantic -Wall -Wextra -Weffc++ -g --coverage
+WARNING_CXXFLAGS = -Wall -Wextra -Weffc++ -Wfloat-equal -Wshadow\
+	-Wpointer-arith -Wcast-align -Wstrict-overflow=5\
+	-Wwrite-strings -Wswitch-default -Wswitch-enum -Wparentheses\
+	-Woverloaded-virtual -Wconversion -pedantic
+CXXFLAGS=-std=$(CXX_STANDARD) $(WARNING_CXXFLAGS) -g --coverage
 STATICFLAGS=$(CXXFLAGS) -c -fPIC
 SHAREDFLAGS=$(CXXFLAGS) -shared
 

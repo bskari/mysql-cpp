@@ -96,13 +96,8 @@ int main(int argc, char* argv[]) {
     // Automatically typed selects
     // ***************************
     conn.runQuery(&users, "SELECT * FROM user");
-    const vector<userTuple>::const_iterator end(users.end());
-    for (
-        vector<userTuple>::const_iterator user(users.begin());
-        user != end;
-        ++user
-    ) {
-        cout << *user << endl;
+    for (const auto& user : users) {
+        cout << user << endl;
     }
     users.clear();
 
@@ -148,13 +143,13 @@ int main(int argc, char* argv[]) {
     // **************************************
     try {
         // Wrong number of fields
-        vector<tuple<int>> ages;
-        conn.runQuery(&ages, "SELECT * FROM user");
+        vector<tuple<int>> selectAges;
+        conn.runQuery(&selectAges, "SELECT * FROM user");
     } catch (const MySqlException& e) {
         cout << e.what() << endl;
     }
 
-    return EXIT_SUCCESS;
+    exit(EXIT_SUCCESS);
 }
 
 

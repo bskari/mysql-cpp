@@ -52,8 +52,11 @@ void testSetResult() {
     }
 #endif
     TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
     TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
     TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+#pragma GCC diagnostic pop
     TYPE_TEST_SET_RESULT(char)   // NOLINT[readability/casting]
     TYPE_TEST_SET_RESULT(int8_t)
     TYPE_TEST_SET_RESULT(uint8_t)
@@ -96,8 +99,11 @@ void testSetResult() {
     }
 #endif
     NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
     NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
     NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+#pragma GCC diagnostic pop
     NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(char)   // NOLINT[readability/casting]
     NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(int8_t)
     NULL_SHARED_PTR_TYPE_TEST_SET_RESULT(uint8_t)
@@ -127,8 +133,11 @@ void testSetResult() {
     }
 #endif
     SHARED_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
     SHARED_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
     SHARED_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+#pragma GCC diagnostic pop
     SHARED_PTR_TYPE_TEST_SET_RESULT(int8_t)
     SHARED_PTR_TYPE_TEST_SET_RESULT(uint8_t)
     SHARED_PTR_TYPE_TEST_SET_RESULT(int16_t)
@@ -173,8 +182,11 @@ void testSetResult() {
     }
 #endif
     NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
     NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
     NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+#pragma GCC diagnostic pop
     NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(char)   // NOLINT[readability/casting]
     NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(int8_t)
     NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(uint8_t)
@@ -201,8 +213,11 @@ void testSetResult() {
     }
 #endif
     NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
     NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
     NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+#pragma GCC diagnostic pop
     NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(char)   // NOLINT[readability/casting]
     NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int8_t)
     NULL_UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint8_t)
@@ -232,8 +247,11 @@ void testSetResult() {
     }
 #endif
     UNIQUE_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
     UNIQUE_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
     UNIQUE_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+#pragma GCC diagnostic pop
     UNIQUE_PTR_TYPE_TEST_SET_RESULT(int8_t)
     UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint8_t)
     UNIQUE_PTR_TYPE_TEST_SET_RESULT(int16_t)
@@ -278,8 +296,11 @@ void testSetResult() {
     }
 #endif
     NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
     NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(float)  // NOLINT[readability/casting]
     NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(double) // NOLINT[readability/casting]
+#pragma GCC diagnostic pop
     NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(char)   // NOLINT[readability/casting]
     NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int8_t)
     NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(uint8_t)

@@ -79,7 +79,9 @@ void Friend::refetchTruncatedColumns(
     vector<mysql_bind_length_t>* const lengths
 ) {
     // Find which buffers were too small, expand them and refetch
-    vector<tuple<size_t, size_t>> truncatedColumns;
+    typedef unsigned int mysql_column_t;
+    typedef unsigned long mysql_offset_t;
+    vector<tuple<mysql_column_t, mysql_offset_t>> truncatedColumns;
     for (size_t i = 0; i < lengths->size(); ++i) {
         vector<char>& buffer = buffers->at(i);
         const size_t untruncatedLength = lengths->at(i);
@@ -103,16 +105,9 @@ void Friend::refetchTruncatedColumns(
     }
 
     // Refetch only the data that were truncated
-    const vector<tuple<size_t, size_t>>::const_iterator end(
-        truncatedColumns.end());
-    for (
-        vector<tuple<size_t, size_t>>::const_iterator i(
-            truncatedColumns.begin());
-        i != end;
-        ++i
-    ) {
-        const size_t column = get<0>(*i);
-        const size_t offset = get<1>(*i);
+    for (const auto& i : truncatedColumns) {
+        const mysql_column_t column = get<0>(i);
+        const mysql_offset_t offset = get<1>(i);
         MYSQL_BIND& parameter = parameters->at(column);
         const int status = mysql_stmt_fetch_column(
             statement.statementHandle_,

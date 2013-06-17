@@ -344,9 +344,9 @@ void testPreparedStatement() {
 
         MySqlPreparedStatement ps{connection.prepareStatement(
             "INSERT INTO user (name, password) VALUES (?, ?)")};
-        string name("Tessa");
-        string password("password");
-        connection.runCommand(ps, name, password);
+        string userName("Tessa");
+        string userPassword("password");
+        connection.runCommand(ps, userName, userPassword);
 
         MySqlPreparedStatement ps2{connection.prepareStatement(
             "SELECT name, password FROM user WHERE ? = ?")};
