@@ -138,4 +138,39 @@ int Friend::fetch(const MySqlPreparedStatement& statement) {
     return mysql_stmt_fetch(statement.statementHandle_);
 }
 
+
+#ifndef OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL
+#define OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(type) \
+void setResult( \
+    type* const value, \
+    const MYSQL_BIND& bind \
+) { \
+    if (*bind.is_null) { \
+        throw MySqlException(NULL_VALUE_ERROR_MESSAGE); \
+    } \
+    *value = *static_cast<const decltype(value)>(bind.buffer); \
+}
+#endif
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(int8_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(uint8_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(int16_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(uint16_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(int32_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(uint32_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(int64_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(uint64_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(float)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(double)
+void setResult(
+    std::string* const value,
+    const MYSQL_BIND& bind
+) {
+    if (*bind.is_null) {
+        throw MySqlException(NULL_VALUE_ERROR_MESSAGE);
+    }
+    // Strings have an operator= for char*, so we can skip the
+    // lexical_cast and just call this directly
+    *value = static_cast<const char*>(bind.buffer);
+}
+
 }  // namespace OutputBinderPrivate

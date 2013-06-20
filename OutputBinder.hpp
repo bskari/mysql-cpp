@@ -82,37 +82,26 @@ void setResultTuple(
     Tuple* const tuple,
     const std::vector<MYSQL_BIND>& mysqlBindParameters,
     int_<-1>);
-// Keep this in a templated class instead of just defining function overloads
-// so that we don't get unused function warnings
+/**
+ * Default setter for non-specialized types using Boost lexical_cast.
+ */
 template <typename T>
-class OutputBinderResultSetter {
-    public:
-        /**
-         * Default setter for non-specialized types using Boost lexical_cast.
-         */
-        static void setResult(
-            T* const value,
-            const MYSQL_BIND& bind);
-};
+static void setResult(
+    T* const value,
+    const MYSQL_BIND& bind);
+
 template<typename T>
-class OutputBinderResultSetter<std::shared_ptr<T>> {
-    public:
-        static void setResult(
-            std::shared_ptr<T>* const value,
-            const MYSQL_BIND& bind);
-};
+static void setResult(
+    std::shared_ptr<T>* const value,
+    const MYSQL_BIND& bind);
+
 template<typename T>
-class OutputBinderResultSetter<std::unique_ptr<T>> {
-    public:
-        static void setResult(
-            std::unique_ptr<T>* const value,
-            const MYSQL_BIND& bind);
-};
+static void setResult(
+    std::unique_ptr<T>* const value,
+    const MYSQL_BIND& bind);
+
 template<typename T>
-class OutputBinderResultSetter<T*> {
-    public:
-        static void setResult(T** const, const MYSQL_BIND&);
-};
+static void setResult(T** const, const MYSQL_BIND&);
 
 
 template<typename Tuple, int I>
@@ -131,17 +120,15 @@ void bindParameters(
     std::vector<my_bool> const,
     int_<-1>
 );
-// Keep this in a templated class instead of just defining function overloads
-// so that we don't get unused function warnings
+/**
+ * Default setter for non-specialized types using Boost lexical_cast. If
+ * the type doesn't have a specialization, just set it to the string type.
+ * MySQL will convert the value to a string and we'll use Boost
+ * lexical_cast to convert it back later.
+ */
 template <typename T>
 class OutputBinderParameterSetter {
     public:
-        /**
-         * Default setter for non-specialized types using Boost lexical_cast. If
-         * the type doesn't have a specialization, just set it to the string type.
-         * MySQL will convert the value to a string and we'll use Boost
-         * lexical_cast to convert it back later.
-         */
         static void setParameter(
             MYSQL_BIND* const bind,
             std::vector<char>* const buffer,
@@ -179,10 +166,7 @@ void setResultTuple(
     const std::vector<MYSQL_BIND>& outputParameters,
     int_<I>
 ) {
-    OutputBinderResultSetter<
-        typename std::tuple_element<I, Tuple>::type
-    > setter;
-    setter.setResult(&(std::get<I>(*tuple)), outputParameters.at(I));
+    setResult(&(std::get<I>(*tuple)), outputParameters.at(I));
     setResultTuple(
         tuple,
         outputParameters,
@@ -235,7 +219,7 @@ void bindParameters(
 
 
 template <typename T>
-void OutputBinderResultSetter<T>::setResult(
+void setResult(
     T* const value,
     const MYSQL_BIND& bind
 ) {
@@ -250,8 +234,8 @@ void OutputBinderResultSetter<T>::setResult(
 // ************************************************************
 // Partial specialization for smart pointer types for setResult
 // ************************************************************
-template<typename T>
-void OutputBinderResultSetter<std::shared_ptr<T>>::setResult(
+template <typename T>
+void setResult(
     std::shared_ptr<T>* const value,
     const MYSQL_BIND& bind
 ) {
@@ -264,13 +248,12 @@ void OutputBinderResultSetter<std::shared_ptr<T>>::setResult(
         // constructor direcly instead of allocating the object and then using
         // the assignment operator
         T* newObject = new T;
-        OutputBinderResultSetter<T> setter;
-        setter.setResult(newObject, bind);
+        setResult(newObject, bind);
         *value = std::shared_ptr<T>(newObject);
     }
 }
-template<typename T>
-void OutputBinderResultSetter<std::unique_ptr<T>>::setResult(
+template <typename T>
+void setResult(
     std::unique_ptr<T>* const value,
     const MYSQL_BIND& bind
 ) {
@@ -283,16 +266,15 @@ void OutputBinderResultSetter<std::unique_ptr<T>>::setResult(
         // constructor direcly instead of allocating the object and then using
         // the assignment operator
         T* newObject = new T;
-        OutputBinderResultSetter<T> setter;
-        setter.setResult(newObject, bind);
+        setResult(newObject, bind);
         *value = std::unique_ptr<T>(newObject);
     }
 }
 // *******************************************************
 // Partial specialization for pointer types for setResult
 // *******************************************************
-template<typename T>
-void OutputBinderResultSetter<T*>::setResult(T** const, const MYSQL_BIND&) {
+template <typename T>
+void setResult(T** const, const MYSQL_BIND&) {
     static_assert(
         // C++ guarantees that the sizeof any type >= 0, so this will always
         // give a compile time error
@@ -303,47 +285,27 @@ void OutputBinderResultSetter<T*>::setResult(T** const, const MYSQL_BIND&) {
 // ***********************************
 // Full specializations for setResult
 // ***********************************
-#ifndef OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION
-#define OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(type) \
-template <> \
-class OutputBinderResultSetter<type> { \
-    public: \
-        void setResult( \
-            type* const value, \
-            const MYSQL_BIND& bind \
-        ) { \
-            if (*bind.is_null) { \
-                throw MySqlException(NULL_VALUE_ERROR_MESSAGE); \
-            } \
-            *value = *static_cast<const decltype(value)>(bind.buffer); \
-        } \
-};
+#ifndef OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF
+#define OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF(type) \
+void setResult( \
+    type* const value, \
+    const MYSQL_BIND& bind \
+);
 #endif
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int8_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint8_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int16_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint16_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int32_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint32_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(int64_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(uint64_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(float)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(double)
-template<>
-class OutputBinderResultSetter<std::string> {
-    public:
-        void setResult(
-            std::string* const value,
-            const MYSQL_BIND& bind
-        ) {
-            if (*bind.is_null) {
-                throw MySqlException(NULL_VALUE_ERROR_MESSAGE);
-            }
-            // Strings have an operator= for char*, so we can skip the
-            // lexical_cast and just call this directly
-            *value = static_cast<const char*>(bind.buffer);
-        }
-};
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF(int8_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF(uint8_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF(int16_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF(uint16_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF(int32_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF(uint32_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF(int64_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF(uint64_t)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF(float)
+OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_DEF(double)
+void setResult(
+    std::string* const value,
+    const MYSQL_BIND& bind
+);
 
 
 template <typename T>
