@@ -120,7 +120,7 @@ my_ulonglong MySql::runCommand(
     const char* const command,
     const Args&... args
 ) {
-    MySqlPreparedStatement statement{prepareStatement(command)};
+    MySqlPreparedStatement statement(prepareStatement(command));
     return runCommand(statement, args...);
 }
 
@@ -132,7 +132,7 @@ my_ulonglong MySql::runCommand(
 ) {
     // Commands (e.g. INSERTs or DELETEs) should always have this set to 0
     if (0 != statement.getFieldCount()) {
-        throw MySqlException{"Tried to run query with runCommand"};
+        throw MySqlException("Tried to run query with runCommand");
     }
 
     if (sizeof...(args) != statement.getParameterCount()) {
@@ -143,7 +143,7 @@ my_ulonglong MySql::runCommand(
         errorMessage += " but ";
         errorMessage += boost::lexical_cast<std::string>(sizeof...(args));
         errorMessage += " parameters were provided.";
-        throw MySqlException{errorMessage};
+        throw MySqlException(errorMessage);
     }
 
     std::vector<MYSQL_BIND> bindParameters;
@@ -179,7 +179,7 @@ void MySql::runQuery(
 ) const {
     assert(nullptr != results);
     assert(nullptr != query);
-    MySqlPreparedStatement statement{prepareStatement(query)};
+    MySqlPreparedStatement statement(prepareStatement(query));
     runQuery(results, statement, args...);
 }
 
@@ -195,7 +195,7 @@ void MySql::runQuery(
     // SELECTs should always return something. Commands (e.g. INSERTs or
     // DELETEs) should always have this set to 0.
     if (0 == statement.getFieldCount()) {
-        throw MySqlException{"Tried to run command with runQuery"};
+        throw MySqlException("Tried to run command with runQuery");
     }
 
     // Bind the input parameters
@@ -209,7 +209,7 @@ void MySql::runQuery(
         errorMessage += " but ";
         errorMessage += boost::lexical_cast<std::string>(sizeof...(args));
         errorMessage += " parameters were provided.";
-        throw MySqlException{errorMessage};
+        throw MySqlException(errorMessage);
     }
 
     std::vector<MYSQL_BIND> inputBindParameters;
@@ -219,7 +219,7 @@ void MySql::runQuery(
         statement.statementHandle_,
         inputBindParameters.data())
     ) {
-        throw MySqlException{statement};
+        throw MySqlException(statement);
     }
 
     setResults<OutputArgs...>(statement, results);

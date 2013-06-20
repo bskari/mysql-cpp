@@ -34,7 +34,7 @@ MySqlPreparedStatement::MySqlPreparedStatement(
         if (0 != mysql_stmt_close(statementHandle_)) {
             errorMessage += "; There was an error closing this statement";
         }
-        throw MySqlException{errorMessage};
+        throw MySqlException(errorMessage);
     }
 
     parameterCount_ = mysql_stmt_param_count(statementHandle_);

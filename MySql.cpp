@@ -14,16 +14,37 @@ using std::string;
 using std::vector;
 
 
-    // Delegating constructors are supported in GCC 4.7
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 7)
 MySql::MySql(
     const char* hostname,
     const char* username,
     const char* password,
     const uint16_t port
 )
-    : MySql{hostname, username, password, nullptr, port}
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 7)
+    : MySql(hostname, username, password, nullptr, port)
 {
+}
+#else
+    : connection_(mysql_init(nullptr))
+{
+    if (nullptr == connection_) {
+        throw MySqlException("Unable to connect to MySQL");
+    }
+
+    const MYSQL* const success = mysql_real_connect(
+        connection_,
+        hostname,
+        username,
+        password,
+        nullptr,
+        port,
+        nullptr,
+        0);
+    if (nullptr == success) {
+        MySqlException mse(connection_);
+        mysql_close(connection_);
+        throw mse;
+    }
 }
 #endif
 
@@ -35,7 +56,7 @@ MySql::MySql(
     const char* const database,
     const uint16_t port
 )
-    : connection_{mysql_init(nullptr)}
+    : connection_(mysql_init(nullptr))
 {
     if (nullptr == connection_) {
         throw MySqlException("Unable to connect to MySQL");
@@ -51,7 +72,7 @@ MySql::MySql(
         nullptr,
         0);
     if (nullptr == success) {
-        MySqlException mse{connection_};
+        MySqlException mse(connection_);
         mysql_close(connection_);
         throw mse;
     }
@@ -65,7 +86,7 @@ MySql::~MySql() {
 
 my_ulonglong MySql::runCommand(const char* const command) {
     if (0 != mysql_real_query(connection_, command, strlen(command))) {
-        throw MySqlException{connection_};
+        throw MySqlException(connection_);
     }
 
     // If the user ran a SELECT statement or something else, at least warn them
@@ -75,7 +96,7 @@ my_ulonglong MySql::runCommand(const char* const command) {
         MYSQL_RES* const result = mysql_store_result(connection_);
         mysql_free_result(result);
 
-        throw MySqlException{"Tried to run query with runCommand"};
+        throw MySqlException("Tried to run query with runCommand");
     }
 
     return affectedRows;

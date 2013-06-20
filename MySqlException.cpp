@@ -7,19 +7,19 @@
 using std::string;
 
 MySqlException::MySqlException(const string& message)
-    : message_{message}
+    : message_(message)
 {
 }
 
 
 MySqlException::MySqlException(const MYSQL* const connection)
-    : message_{getServerErrorMessage(connection)}
+    : message_(getServerErrorMessage(connection))
 {
 }
 
 
 MySqlException::MySqlException(const MySqlPreparedStatement& statement)
-    : message_{getServerErrorMessage(statement.statementHandle_)}
+    : message_(getServerErrorMessage(statement.statementHandle_))
 {
 }
 

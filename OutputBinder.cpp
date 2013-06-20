@@ -24,13 +24,13 @@ void Friend::throwIfParameterCountWrong(
 ) {
     // Check that the sizes match
     if (statement.getFieldCount() != numRequiredParameters) {
-        string errorMessage{
-            "Incorrect number of output parameters; query required "};
+        string errorMessage(
+            "Incorrect number of output parameters; query required ");
         errorMessage += lexical_cast<string>(statement.getFieldCount());
         errorMessage += " but ";
         errorMessage += lexical_cast<string>(numRequiredParameters);
         errorMessage += " parameters were provided";
-        throw MySqlException{errorMessage};
+        throw MySqlException(errorMessage);
     }
 }
 
@@ -43,11 +43,11 @@ int Friend::bindAndExecuteStatement(
         statement.statementHandle_,
         parameters->data()))
     {
-        throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
+        throw MySqlException(mysql_stmt_error(statement.statementHandle_));
     }
 
     if (0 != mysql_stmt_execute(statement.statementHandle_)) {
-        throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
+        throw MySqlException(mysql_stmt_error(statement.statementHandle_));
     }
     
     return mysql_stmt_fetch(statement.statementHandle_);
@@ -62,15 +62,14 @@ void Friend::throwIfFetchError(
             // No problem! All rows fetched.
             break;
         case 1: {  // Error occurred {
-            throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
+            throw MySqlException(mysql_stmt_error(statement.statementHandle_));
         }
         default: {
             assert(false && "Unknown error code from mysql_stmt_fetch");
-            throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
+            throw MySqlException(mysql_stmt_error(statement.statementHandle_));
         }
     }
 }
-
 
 void Friend::refetchTruncatedColumns(
     const MySqlPreparedStatement& statement,
@@ -115,7 +114,7 @@ void Friend::refetchTruncatedColumns(
             column,
             offset);
         if (0 != status) {
-            throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
+            throw MySqlException(mysql_stmt_error(statement.statementHandle_));
         }
 
         // Now, for subsequent fetches, we need to reset the buffers
@@ -129,48 +128,13 @@ void Friend::refetchTruncatedColumns(
         statement.statementHandle_,
         parameters->data()))
     {
-        throw MySqlException{mysql_stmt_error(statement.statementHandle_)};
+        throw MySqlException(mysql_stmt_error(statement.statementHandle_));
     }
 }
 
 
 int Friend::fetch(const MySqlPreparedStatement& statement) {
     return mysql_stmt_fetch(statement.statementHandle_);
-}
-
-
-#ifndef OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL
-#define OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(type) \
-void setResult( \
-    type* const value, \
-    const MYSQL_BIND& bind \
-) { \
-    if (*bind.is_null) { \
-        throw MySqlException(NULL_VALUE_ERROR_MESSAGE); \
-    } \
-    *value = *static_cast<const decltype(value)>(bind.buffer); \
-}
-#endif
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(int8_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(uint8_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(int16_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(uint16_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(int32_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(uint32_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(int64_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(uint64_t)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(float)
-OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION_IMPL(double)
-void setResult(
-    std::string* const value,
-    const MYSQL_BIND& bind
-) {
-    if (*bind.is_null) {
-        throw MySqlException(NULL_VALUE_ERROR_MESSAGE);
-    }
-    // Strings have an operator= for char*, so we can skip the
-    // lexical_cast and just call this directly
-    *value = static_cast<const char*>(bind.buffer);
 }
 
 }  // namespace OutputBinderPrivate

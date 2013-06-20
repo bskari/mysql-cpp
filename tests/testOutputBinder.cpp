@@ -46,7 +46,8 @@ void testSetResult() {
     bind.buffer = &result; \
     bind.is_null = &nullFlag; \
     type output; \
-    OutputBinderPrivate::setResult(&output, bind); \
+    OutputBinderPrivate::OutputBinderResultSetter<type> setter; \
+    setter.setResult(&output, bind); \
     BOOST_CHECK(result == output); \
     }
 #endif
@@ -77,7 +78,8 @@ void testSetResult() {
         bind.buffer = &buffer.at(0);
         bind.is_null = &nullFlag;
         string output;
-        OutputBinderPrivate::setResult(&output, bind);
+        OutputBinderPrivate::OutputBinderResultSetter<string> setter;
+        setter.setResult(&output, bind);
         BOOST_CHECK(result.size() == output.size());
         BOOST_CHECK(result == output);
     }
@@ -91,7 +93,8 @@ void testSetResult() {
         nullFlag = true; \
         bind.buffer = &output; \
         bind.is_null = &nullFlag; \
-        OutputBinderPrivate::setResult(&result, bind); \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(result)> setter; \
+        setter.setResult(&result, bind); \
         BOOST_CHECK(0 == result.get()); \
     }
 #endif
@@ -121,7 +124,8 @@ void testSetResult() {
         bind.buffer = &output; \
         nullFlag = false; \
         bind.is_null = &nullFlag; \
-        OutputBinderPrivate::setResult(&ptr, bind); \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter; \
+        setter.setResult(&ptr, bind); \
         BOOST_CHECK(nullptr != ptr.get()); \
         if (nullptr != ptr.get()) { \
             BOOST_CHECK(output == *ptr); \
@@ -155,7 +159,8 @@ void testSetResult() {
         bind.buffer = &buffer.at(0);
         nullFlag = false;
         bind.is_null = &nullFlag;
-        OutputBinderPrivate::setResult(&ptr, bind);
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter;
+        setter.setResult(&ptr, bind);
         BOOST_CHECK(nullptr != ptr.get());
         if (nullptr != ptr.get()) {
             BOOST_CHECK(result.size() == ptr->size());
@@ -172,7 +177,8 @@ void testSetResult() {
         nullFlag = true; \
         bind.buffer = &output; \
         bind.is_null = &nullFlag; \
-        BOOST_CHECK_THROW(OutputBinderPrivate::setResult(&output, bind), MySqlException); \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(output)> setter; \
+        BOOST_CHECK_THROW(setter.setResult(&output, bind), MySqlException); \
     }
 #endif
     NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
@@ -201,7 +207,8 @@ void testSetResult() {
         nullFlag = true; \
         bind.buffer = &output; \
         bind.is_null = &nullFlag; \
-        OutputBinderPrivate::setResult(&result, bind); \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(result)> setter; \
+        setter.setResult(&result, bind); \
         BOOST_CHECK(0 == result.get()); \
     }
 #endif
@@ -231,7 +238,8 @@ void testSetResult() {
         bind.buffer = &output; \
         nullFlag = false; \
         bind.is_null = &nullFlag; \
-        OutputBinderPrivate::setResult(&ptr, bind); \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter; \
+        setter.setResult(&ptr, bind); \
         BOOST_CHECK(nullptr != ptr.get()); \
         if (nullptr != ptr.get()) { \
             BOOST_CHECK(output == *ptr); \
@@ -265,7 +273,8 @@ void testSetResult() {
         bind.buffer = &buffer.at(0);
         nullFlag = false;
         bind.is_null = &nullFlag;
-        OutputBinderPrivate::setResult(&ptr, bind);
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter;
+        setter.setResult(&ptr, bind);
         BOOST_CHECK(nullptr != ptr.get());
         if (nullptr != ptr.get()) {
             BOOST_CHECK(result.size() == ptr->size());
@@ -282,9 +291,8 @@ void testSetResult() {
         nullFlag = true; \
         bind.buffer = &output; \
         bind.is_null = &nullFlag; \
-        BOOST_CHECK_THROW( \
-            OutputBinderPrivate::setResult(&output, bind), \
-            MySqlException); \
+        OutputBinderPrivate::OutputBinderResultSetter<decltype(output)> setter; \
+        BOOST_CHECK_THROW(setter.setResult(&output, bind), MySqlException); \
     }
 #endif
     NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]

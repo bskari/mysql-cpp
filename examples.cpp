@@ -29,6 +29,9 @@ void printTuple(basic_ostream<Char, Traits>& out, Tuple const& t, int_<I>);
 template <typename Char, typename Traits, typename Tuple>
 void printTuple(basic_ostream<Char, Traits>& out, Tuple const& t, int_<0>);
 
+template <typename Tuple>
+void printTupleVector(const vector<Tuple>& v);
+
 template <typename Char, typename Traits, typename... Args>
 ostream& operator<<(basic_ostream<Char, Traits>& out, tuple<Args...> const& t);
 
@@ -44,7 +47,7 @@ int main(int argc, char* argv[]) {
     } else {
         password = argv[1];
     }
-    MySql conn{"127.0.0.1", "root", password.c_str(), nullptr};
+    MySql conn("127.0.0.1", "root", password.c_str(), nullptr);
 
     // Initialize a new test database
     conn.runCommand("DROP DATABASE IF EXISTS test_mysql_cpp");
@@ -83,7 +86,7 @@ int main(int argc, char* argv[]) {
     // *****************************************
     // All commands use safe prepared statements
     // *****************************************
-    const string naughtyUser{"brandon@skari.org'; DROP TABLE users; -- "};
+    const string naughtyUser("brandon@skari.org'; DROP TABLE users; -- ");
     conn.runQuery(&users, "SELECT * FROM user WHERE email = ?", naughtyUser);
     assert(0 == users.size());
 
@@ -96,9 +99,7 @@ int main(int argc, char* argv[]) {
     // Automatically typed selects
     // ***************************
     conn.runQuery(&users, "SELECT * FROM user");
-    for (const auto& user : users) {
-        cout << user << endl;
-    }
+    printTupleVector(users);
     users.clear();
 
     // ************************
@@ -125,10 +126,7 @@ int main(int argc, char* argv[]) {
     > autoPtrUserTuple;
     vector<autoPtrUserTuple> autoPtrUsers;
     conn.runQuery(&autoPtrUsers, "SELECT * FROM user");
-    for (const auto& user : autoPtrUsers) {
-        cout << user << endl;
-    }
-
+    printTupleVector(autoPtrUsers);
 
     // *********************************************
     // Raw pointers are gross, so this won't compile
@@ -162,6 +160,30 @@ void printTuple(basic_ostream<Char, Traits>& out, Tuple const& t, int_<I>) {
 template<typename Char, typename Traits, typename Tuple>
 void printTuple(basic_ostream<Char, Traits>& out, Tuple const& t, int_<0>) {
       out << get<0>(t);
+}
+
+template <typename Tuple>
+void printTupleVector(const vector<Tuple>& v) {
+#if __GNUC__ >= 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+    for (const auto& item : v)
+    {
+        cout << item << endl;
+    }
+#elif __GNUC__ >= 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
+    auto end = v.cend();
+    for (auto item(v.cbegin()); item != end; ++item) {
+        cout << *item<< endl;
+    }
+#else
+    vector<Tuple>::const_iterator end(users.end());
+    for (
+        vector<Tuple>::const_iterator item(v.begin());
+        item != end;
+        ++item
+    ) {
+        cout << *item << endl;
+    }
+#endif
 }
 
 template<typename Char, typename Traits, typename... Args>

@@ -338,18 +338,18 @@ void testInvalidCommands() {
 void testPreparedStatement() {
     try {
         const char* const host = "localhost";
-        MySql connection{host, username, password, database};
+        MySql connection(host, username, password, database);
 
         createUserTable(&connection);
 
-        MySqlPreparedStatement ps{connection.prepareStatement(
-            "INSERT INTO user (name, password) VALUES (?, ?)")};
+        MySqlPreparedStatement ps(connection.prepareStatement(
+            "INSERT INTO user (name, password) VALUES (?, ?)"));
         string userName("Tessa");
         string userPassword("password");
         connection.runCommand(ps, userName, userPassword);
 
-        MySqlPreparedStatement ps2{connection.prepareStatement(
-            "SELECT name, password FROM user WHERE ? = ?")};
+        MySqlPreparedStatement ps2(connection.prepareStatement(
+            "SELECT name, password FROM user WHERE ? = ?"));
         int a, b;
         a = b = 1;
         vector<tuple<string, string>> output;
