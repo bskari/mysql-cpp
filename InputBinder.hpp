@@ -65,8 +65,7 @@ struct InputBinder<N, char*, Tail...> {
         bindParameter.is_unsigned = 0;
         bindParameter.is_null = 0;
 
-        InputBinder<N + 1, Tail...> b;
-        b.bind(bindParameters, tail...);
+        InputBinder<N + 1, Tail...>::bind(bindParameters, tail...);
     }
 };
 template <size_t N, typename... Tail>
@@ -76,8 +75,10 @@ struct InputBinder<N, const char*, Tail...> {
         const char* const& value,
         const Tail&... tail
     ) {
-        InputBinder<N, char*, Tail...> binder;
-        binder.bind(bindParameters, const_cast<char*>(value), tail...);
+        InputBinder<N, char*, Tail...>::bind(
+            bindParameters,
+            const_cast<char*>(value),
+            tail...);
     }
 };
 
@@ -103,8 +104,7 @@ struct InputBinder<N, std::string, Tail...> {
         bindParameter.is_unsigned = 0;
         bindParameter.is_null = 0;
 
-        InputBinder<N + 1, Tail...> b;
-        b.bind(bindParameters, tail...);
+        InputBinder<N + 1, Tail...>::bind(bindParameters, tail...);
     }
 };
 
@@ -125,8 +125,7 @@ struct InputBinder<N, type, Tail...> { \
             static_cast<const void*>(&value)); \
         bindParameter.is_unsigned = isUnsigned; \
         bindParameter.is_null = 0; \
-        InputBinder<N + 1, Tail...> binder; \
-        binder.bind(bindParameters, tail...); \
+        InputBinder<N + 1, Tail...>::bind(bindParameters, tail...); \
     } \
 };
 #endif
@@ -158,8 +157,7 @@ struct InputBinder<N, type, Tail...> { \
         bindParameter.buffer = const_cast<void*>( \
             static_cast<const void*>(&value)); \
         bindParameter.is_null = 0; \
-        InputBinder<N + 1, Tail...> b; \
-        b.bind(bindParameters, tail...); \
+        InputBinder<N + 1, Tail...>::bind(bindParameters, tail...); \
     } \
 };
 #endif
@@ -175,8 +173,9 @@ void bindInputs(
     std::vector<MYSQL_BIND>* const inputBindParameters,
     const Args&... args
 ) {
-    InputBinderPrivate::InputBinder<0, Args...> binder;
-    binder.bind(inputBindParameters, args...);
+    InputBinderPrivate::InputBinder<0, Args...>::bind(
+        inputBindParameters,
+        args...);
 }
 
 #endif  // INPUTBINDER_HPP_

@@ -18,9 +18,8 @@ void testBind() {
     { \
         vector<MYSQL_BIND> binds; \
         binds.resize(1); \
-        InputBinderPrivate::InputBinder<0, type> binder; \
         type t = 0; \
-        binder.bind(&binds, t); \
+        InputBinderPrivate::InputBinder<0, type>::bind(&binds, t); \
         BOOST_CHECK(mysqlType == binds.at(0).buffer_type); \
         BOOST_CHECK(0 == binds.at(0).is_null); \
         BOOST_CHECK(isUnsigned == binds.at(0).is_unsigned); \
@@ -42,9 +41,8 @@ void testBind() {
     {
         vector<MYSQL_BIND> binds;
         binds.resize(1);
-        InputBinderPrivate::InputBinder<0, float> binder;
         float t = 0.0;
-        binder.bind(&binds, t);
+        InputBinderPrivate::InputBinder<0, float>::bind(&binds, t);
         BOOST_CHECK(MYSQL_TYPE_FLOAT == binds.at(0).buffer_type);
         BOOST_CHECK(0 == binds.at(0).is_null);
         // MySQL ignores require the is_unsigned field for floting point types,
@@ -55,9 +53,8 @@ void testBind() {
     {
         vector<MYSQL_BIND> binds;
         binds.resize(1);
-        InputBinderPrivate::InputBinder<0, double> binder;
         double t = 0;
-        binder.bind(&binds, t);
+        InputBinderPrivate::InputBinder<0, double>::bind(&binds, t);
         BOOST_CHECK(MYSQL_TYPE_DOUBLE == binds.at(0).buffer_type);
         BOOST_CHECK(0 == binds.at(0).is_null);
         // MySQL ignores require the is_unsigned field for floting point types,
@@ -68,10 +65,9 @@ void testBind() {
     {
         vector<MYSQL_BIND> binds;
         binds.resize(1);
-        InputBinderPrivate::InputBinder<0, char*> binder;
         char t[50];
         strncpy(t, "Hello world", sizeof(t) / sizeof(t[0]));
-        binder.bind(&binds, t);
+        InputBinderPrivate::InputBinder<0, char*>::bind(&binds, t);
         BOOST_CHECK(MYSQL_TYPE_STRING == binds.at(0).buffer_type);
         BOOST_CHECK(strlen(t) == binds.at(0).buffer_length);
         BOOST_CHECK(0 == binds.at(0).is_null);
@@ -81,9 +77,8 @@ void testBind() {
     {
         vector<MYSQL_BIND> binds;
         binds.resize(1);
-        InputBinderPrivate::InputBinder<0, const char*> binder;
         const char t[50] = "Hello world";
-        binder.bind(&binds, t);
+        InputBinderPrivate::InputBinder<0, const char*>::bind(&binds, t);
         BOOST_CHECK(MYSQL_TYPE_STRING == binds.at(0).buffer_type);
         BOOST_CHECK(strlen(t) == binds.at(0).buffer_length);
         BOOST_CHECK(0 == binds.at(0).is_null);
@@ -93,9 +88,8 @@ void testBind() {
     {
         vector<MYSQL_BIND> binds;
         binds.resize(1);
-        InputBinderPrivate::InputBinder<0, string> binder;
         string t("Hello world");
-        binder.bind(&binds, t);
+        InputBinderPrivate::InputBinder<0, string>::bind(&binds, t);
         BOOST_CHECK(MYSQL_TYPE_STRING == binds.at(0).buffer_type);
         BOOST_CHECK(t.size() == binds.at(0).buffer_length);
         BOOST_CHECK(0 == binds.at(0).is_null);

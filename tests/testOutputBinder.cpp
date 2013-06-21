@@ -18,6 +18,8 @@ using std::stringstream;
 using std::unique_ptr;
 using std::vector;
 
+using namespace OutputBinderPrivate;
+
 /**
  * Use this instead of boost::weakLexicalCast because we don't care about
  * truncation errors.
@@ -46,8 +48,7 @@ void testSetResult() {
     bind.buffer = &result; \
     bind.is_null = &nullFlag; \
     type output; \
-    OutputBinderPrivate::OutputBinderResultSetter<type> setter; \
-    setter.setResult(&output, bind); \
+    OutputBinderResultSetter<type>::setResult(&output, bind); \
     BOOST_CHECK(result == output); \
     }
 #endif
@@ -78,8 +79,7 @@ void testSetResult() {
         bind.buffer = &buffer.at(0);
         bind.is_null = &nullFlag;
         string output;
-        OutputBinderPrivate::OutputBinderResultSetter<string> setter;
-        setter.setResult(&output, bind);
+        OutputBinderResultSetter<string>::setResult(&output, bind);
         BOOST_CHECK(result.size() == output.size());
         BOOST_CHECK(result == output);
     }
@@ -93,8 +93,7 @@ void testSetResult() {
         nullFlag = true; \
         bind.buffer = &output; \
         bind.is_null = &nullFlag; \
-        OutputBinderPrivate::OutputBinderResultSetter<decltype(result)> setter; \
-        setter.setResult(&result, bind); \
+        OutputBinderResultSetter<decltype(result)>::setResult(&result, bind); \
         BOOST_CHECK(0 == result.get()); \
     }
 #endif
@@ -124,8 +123,7 @@ void testSetResult() {
         bind.buffer = &output; \
         nullFlag = false; \
         bind.is_null = &nullFlag; \
-        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter; \
-        setter.setResult(&ptr, bind); \
+        OutputBinderResultSetter<decltype(ptr)>::setResult(&ptr, bind); \
         BOOST_CHECK(nullptr != ptr.get()); \
         if (nullptr != ptr.get()) { \
             BOOST_CHECK(output == *ptr); \
@@ -159,8 +157,7 @@ void testSetResult() {
         bind.buffer = &buffer.at(0);
         nullFlag = false;
         bind.is_null = &nullFlag;
-        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter;
-        setter.setResult(&ptr, bind);
+        OutputBinderResultSetter<decltype(ptr)>::setResult(&ptr, bind);
         BOOST_CHECK(nullptr != ptr.get());
         if (nullptr != ptr.get()) {
             BOOST_CHECK(result.size() == ptr->size());
@@ -177,8 +174,9 @@ void testSetResult() {
         nullFlag = true; \
         bind.buffer = &output; \
         bind.is_null = &nullFlag; \
-        OutputBinderPrivate::OutputBinderResultSetter<decltype(output)> setter; \
-        BOOST_CHECK_THROW(setter.setResult(&output, bind), MySqlException); \
+        BOOST_CHECK_THROW( \
+            OutputBinderResultSetter<decltype(output)>::setResult(&output, bind), \
+            MySqlException); \
     }
 #endif
     NULL_NON_SHARED_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
@@ -207,8 +205,7 @@ void testSetResult() {
         nullFlag = true; \
         bind.buffer = &output; \
         bind.is_null = &nullFlag; \
-        OutputBinderPrivate::OutputBinderResultSetter<decltype(result)> setter; \
-        setter.setResult(&result, bind); \
+        OutputBinderResultSetter<decltype(result)>::setResult(&result, bind); \
         BOOST_CHECK(0 == result.get()); \
     }
 #endif
@@ -238,8 +235,7 @@ void testSetResult() {
         bind.buffer = &output; \
         nullFlag = false; \
         bind.is_null = &nullFlag; \
-        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter; \
-        setter.setResult(&ptr, bind); \
+        OutputBinderResultSetter<decltype(ptr)>::setResult(&ptr, bind); \
         BOOST_CHECK(nullptr != ptr.get()); \
         if (nullptr != ptr.get()) { \
             BOOST_CHECK(output == *ptr); \
@@ -273,8 +269,7 @@ void testSetResult() {
         bind.buffer = &buffer.at(0);
         nullFlag = false;
         bind.is_null = &nullFlag;
-        OutputBinderPrivate::OutputBinderResultSetter<decltype(ptr)> setter;
-        setter.setResult(&ptr, bind);
+        OutputBinderResultSetter<decltype(ptr)>::setResult(&ptr, bind);
         BOOST_CHECK(nullptr != ptr.get());
         if (nullptr != ptr.get()) {
             BOOST_CHECK(result.size() == ptr->size());
@@ -291,8 +286,9 @@ void testSetResult() {
         nullFlag = true; \
         bind.buffer = &output; \
         bind.is_null = &nullFlag; \
-        OutputBinderPrivate::OutputBinderResultSetter<decltype(output)> setter; \
-        BOOST_CHECK_THROW(setter.setResult(&output, bind), MySqlException); \
+        BOOST_CHECK_THROW( \
+            OutputBinderResultSetter<decltype(output)>::setResult(&output, bind), \
+            MySqlException); \
     }
 #endif
     NULL_NON_UNIQUE_PTR_TYPE_TEST_SET_RESULT(int)    // NOLINT[readability/casting]
@@ -324,11 +320,11 @@ void testSetParameter() {
 #define TYPE_TEST_SET_PARAMETER(type, mysqlType, isUnsigned) \
     { \
     vector<char> buffer; \
-    OutputBinderPrivate::OutputBinderParameterSetter<type> setter; \
-    setter.setParameter(&bind, &buffer, &nullFlag); \
+    OutputBinderParameterSetter<type>::setParameter(&bind, &buffer, &nullFlag); \
     BOOST_CHECK(sizeof(type) == buffer.size()); \
     BOOST_CHECK(bind.buffer == &buffer.at(0)); \
-    BOOST_CHECK(static_cast<bool>(bind.is_unsigned) \
+    BOOST_CHECK( \
+        static_cast<bool>(bind.is_unsigned) \
         == static_cast<bool>(isUnsigned)); \
     BOOST_CHECK(bind.is_null == &nullFlag); \
     }
@@ -350,8 +346,7 @@ void testSetParameter() {
     {  // NOLINT[whitespace/parens]
         class UserType {};
         vector<char> buffer;
-        OutputBinderPrivate::OutputBinderParameterSetter<UserType> setter;
-        setter.setParameter(&bind, &buffer, &nullFlag);
+        OutputBinderParameterSetter<UserType>::setParameter(&bind, &buffer, &nullFlag);
         BOOST_CHECK(bind.buffer == &buffer.at(0));
         BOOST_CHECK(bind.is_null == &nullFlag);
     }
@@ -361,11 +356,11 @@ void testSetParameter() {
 #define SHARED_PTR_TYPE_TEST_SET_PARAMETER(type, mysqlType, isUnsigned) \
     { \
     vector<char> buffer; \
-    OutputBinderPrivate::OutputBinderParameterSetter<shared_ptr<type>> setter; \
-    setter.setParameter(&bind, &buffer, &nullFlag); \
+    OutputBinderParameterSetter<shared_ptr<type>>::setParameter(&bind, &buffer, &nullFlag); \
     BOOST_CHECK(sizeof(type) == buffer.size()); \
     BOOST_CHECK(bind.buffer == &buffer.at(0)); \
-    BOOST_CHECK(static_cast<bool>(bind.is_unsigned) \
+    BOOST_CHECK( \
+        static_cast<bool>(bind.is_unsigned) \
         == static_cast<bool>(isUnsigned)); \
     BOOST_CHECK(bind.is_null == &nullFlag); \
     }

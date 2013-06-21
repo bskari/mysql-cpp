@@ -180,8 +180,7 @@ void setResultTuple(
 ) {
     OutputBinderResultSetter<
         typename std::tuple_element<I, Tuple>::type
-    > setter;
-    setter.setResult(&(std::get<I>(*tuple)), outputParameters.at(I));
+    >::setResult(&(std::get<I>(*tuple)), outputParameters.at(I));
     setResultTuple(
         tuple,
         outputParameters,
@@ -219,8 +218,7 @@ void bindParameters(
 ) {
     OutputBinderParameterSetter<
         typename std::tuple_element<I, Tuple>::type
-    > setter;
-    setter.setParameter(
+    >::setParameter(
         &mysqlBindParameters->at(I),
         &buffers->at(I),
         &nullFlags->at(I));
@@ -263,8 +261,7 @@ void OutputBinderResultSetter<std::shared_ptr<T>>::setResult(
         // constructor direcly instead of allocating the object and then using
         // the assignment operator
         T* newObject = new T;
-        OutputBinderResultSetter<T> setter;
-        setter.setResult(newObject, bind);
+        OutputBinderResultSetter<T>::setResult(newObject, bind);
         *value = std::shared_ptr<T>(newObject);
     }
 }
@@ -282,8 +279,7 @@ void OutputBinderResultSetter<std::unique_ptr<T>>::setResult(
         // constructor direcly instead of allocating the object and then using
         // the assignment operator
         T* newObject = new T;
-        OutputBinderResultSetter<T> setter;
-        setter.setResult(newObject, bind);
+        OutputBinderResultSetter<T>::setResult(newObject, bind);
         *value = std::unique_ptr<T>(newObject);
     }
 }
@@ -307,7 +303,7 @@ void OutputBinderResultSetter<T*>::setResult(T** const, const MYSQL_BIND&) {
 template <> \
 class OutputBinderResultSetter<type> { \
     public: \
-        void setResult( \
+        static void setResult( \
             type* const value, \
             const MYSQL_BIND& bind \
         ) { \
@@ -331,7 +327,7 @@ OUTPUT_BINDER_ELEMENT_SETTER_SPECIALIZATION(double)
 template <>
 class OutputBinderResultSetter<std::string> {
     public:
-        void setResult(
+        static void setResult(
             std::string* const value,
             const MYSQL_BIND& bind
         ) {
@@ -372,8 +368,7 @@ void OutputBinderParameterSetter<std::shared_ptr<T>>::setParameter(
     my_bool* const isNullFlag
 ) {
     // Just forward to the full specialization
-    OutputBinderParameterSetter<T> setter;
-    setter.setParameter(bind, buffer, isNullFlag);
+    OutputBinderParameterSetter<T>::setParameter(bind, buffer, isNullFlag);
 }
 template<typename T>
 void OutputBinderParameterSetter<std::unique_ptr<T>>::setParameter(
@@ -382,8 +377,7 @@ void OutputBinderParameterSetter<std::unique_ptr<T>>::setParameter(
     my_bool* const isNullFlag
 ) {
     // Just forward to the full specialization
-    OutputBinderParameterSetter<T> setter;
-    setter.setParameter(bind, buffer, isNullFlag);
+    OutputBinderParameterSetter<T>::setParameter(bind, buffer, isNullFlag);
 }
 // *********************************************************
 // Partial specialization for pointer types for setParameter
