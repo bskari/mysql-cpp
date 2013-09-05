@@ -15,8 +15,8 @@ class MySqlException : public std::exception {
         explicit MySqlException(const MySqlPreparedStatement& statement);
         ~MySqlException() noexcept;
 
-        MySqlException& operator=(const MySqlException&) = delete;
-        MySqlException& operator=(MySqlException&&) = delete;
+//        MySqlException& operator=(const MySqlException&) = delete;
+//        MySqlException& operator=(MySqlException&&) = delete;
 
         const char* what() const noexcept;
 
