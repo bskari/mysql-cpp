@@ -334,9 +334,9 @@ class OutputBinderResultSetter<std::string> {
             if (*bind.is_null) {
                 throw MySqlException(NULL_VALUE_ERROR_MESSAGE);
             }
-            // Strings have an operator= for char*, so we can skip the
-            // lexical_cast and just call this directly
-            *value = static_cast<const char*>(bind.buffer);
+            // bind.buffer may not terminated with '\0', so we should use
+            // string::assign() and specify the column length.
+            value->assign(static_cast<const char*>(bind.buffer), *(bind.length));
         }
 };
 
