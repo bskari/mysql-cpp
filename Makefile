@@ -36,7 +36,7 @@ OutputBinder.o: OutputBinder.hpp OutputBinder.cpp MySqlPreparedStatement.hpp
 
 libmysqlcpp.so: MySql.o MySql.hpp MySqlException.o MySqlException.hpp \
 	MySqlPreparedStatement.o InputBinder.hpp OutputBinder.o OutputBinder.hpp
-	$(CXX) $(CXXFLAGS) $(SHAREDFLAGS) -W1,-soname,libmysqlcpp.so \
+	$(CXX) $(CXXFLAGS) $(SHAREDFLAGS) -Wl,-soname,libmysqlcpp.so \
 		MySql.o MySqlException.o MySqlPreparedStatement.o OutputBinder.o \
 		-o libmysqlcpp.so
 
